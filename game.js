@@ -125,9 +125,9 @@ function slotInner(i){
   const grew=S.tour.lastGrew.includes(p.name)?"grew":"";
   const tier=ratingTier(p.rating);
   const tourCtx=(S.phase==="tournament"||S.phase==="end");
-  const avg=p.mr.n?(p.mr.sum/p.mr.n):0;
+  const rec=p.recent||[],avg=rec.length?rec.reduce((a,b)=>a+b,0)/rec.length:0;
   const mrCls=avg>=8?"hi":avg>=7?"mid":avg>=6?"ok":"low";
-  const mrBadge=(tourCtx&&p.mr.n)?`<span class="jmr ${mrCls}" title="Avg match rating">${avg.toFixed(1)}</span>`:"";
+  const mrBadge=(tourCtx&&rec.length)?`<span class="jmr ${mrCls}" title="Avg rating, last ${rec.length} match${rec.length>1?"es":""}">${avg.toFixed(1)}</span>`:"";
   const ga=(tourCtx&&(p.tG||p.tA))?`<div class="jga">${p.tG?`<span class="ga-g">⚽${p.tG}</span>`:""}${p.tA?`<span class="ga-a">👟${p.tA}</span>`:""}</div>`:"";
   return `<div class="jersey tier-${tier} ${grew}" title="${p.name} · ${POS_LABEL[s.pos]||s.pos}">
     <div class="kit ${tier}">
@@ -621,21 +621,28 @@ function xiOfMine(){
     .map(s=>({name:s.player.name,sur:surname(s.player.name),rating:s.player.rating,pos:s.pos,kit:s.player.kit,ref:s.player}));
 }
 // scorers: never the keeper, strongly weighted by attacking role then rating
+// HIDDEN form: a player's last-3 match ratings nudge how he performs next game. Never shown.
+function formOf(p){
+  const rec=p&&p.recent||[]; if(rec.length<2)return {adj:0,mul:1};
+  const d=rec.reduce((a,b)=>a+b,0)/rec.length-6.8;
+  return {adj:clamp(d*0.55,-1.6,2.2), mul:clamp(1+d*0.14,0.6,1.7)};
+}
 function pickScorerIdx(xi,excl){
   const cand=xi.map((_,i)=>i).filter(i=>xi[i].pos!=="GK"&&!(excl&&excl.has(i)));
   if(!cand.length)return -1;
-  return weightedPick(cand,i=>Math.pow(ATK_WEIGHT[xi[i].pos]||0.05,1.5)*Math.pow(xi[i].rating,2.0));
+  return weightedPick(cand,i=>Math.pow(ATK_WEIGHT[xi[i].pos]||0.05,1.5)*Math.pow(xi[i].rating+(xi[i].fAdj||0),2.0)*(xi[i].fMul||1));
 }
 function pickAssistIdx(xi,exclude,excl){
   const cand=xi.map((_,i)=>i).filter(i=>i!==exclude&&xi[i].pos!=="GK"&&!(excl&&excl.has(i)));
   if(!cand.length)return -1;
-  return weightedPick(cand,i=>Math.pow(CREATE_WEIGHT[xi[i].pos]||0.05,1.2)*Math.pow(xi[i].rating,1.6));
+  return weightedPick(cand,i=>Math.pow(CREATE_WEIGHT[xi[i].pos]||0.05,1.2)*Math.pow(xi[i].rating+(xi[i].fAdj||0),1.6)*(xi[i].fMul||1));
 }
 function xiRatings(xi){let aw=0,as=0,dw=0,ds=0,sum=0;xi.forEach(p=>{const a=ATK_WEIGHT[p.pos]||0,d=DEF_WEIGHT[p.pos]||0;as+=p.rating*a;aw+=a;ds+=p.rating*d;dw+=d;sum+=p.rating;});const avg=sum/xi.length;return{atk:as/aw+standoutBonus(xi,ATK_WEIGHT,avg),def:ds/dw+standoutBonus(xi,DEF_WEIGHT,avg),ovr:avg};}
 function buildMatch(round){
   const R=teamRatings();
   const opp=round.type==="group"?S.tour.rivals[S.tour.roundIdx]:pickOpponent(round);
   const myXI=xiOfMine(), oppXI=buildOppXI(opp), ev=[];
+  myXI.forEach(x=>{const f=formOf(x.ref);x.fAdj=f.adj;x.fMul=f.mul;}); // hidden form from each player's last 3 ratings
   // opponent strength = the XI you ACTUALLY face (not a fixed team number) → fair matchups
   const OR=xiRatings(oppXI), diff=round.diff;
   const oppAtk=OR.atk*diff, oppDef=OR.def*diff, oppStr=Math.round(OR.ovr*diff);
@@ -643,7 +650,8 @@ function buildMatch(round){
   const tac=S.stats.unlocked?(statVal("tactics")-75)*0.18:0;
   const fit=S.stats.unlocked?Math.max(0,statVal("fitness")-78)*0.03:0;
   const sbA=standoutBonus(myXI,ATK_WEIGHT,R.ovr), sbD=standoutBonus(myXI,DEF_WEIGHT,R.ovr);
-  const myAtk=R.atk+chem+sbA, myDef=R.def+tac+sbD;
+  let faw=0,fa=0,fdw=0,fd=0; myXI.forEach(x=>{const a=ATK_WEIGHT[x.pos]||0,d=DEF_WEIGHT[x.pos]||0;fa+=(x.fAdj||0)*a;faw+=a;fd+=(x.fAdj||0)*d;fdw+=d;});
+  const myAtk=R.atk+chem+sbA+fa/Math.max(.1,faw), myDef=R.def+tac+sbD+fd/Math.max(.1,fdw); // +hidden form
   // higher base = more goals (3:2, 4:3); steeper slope = the better XI wins more reliably
   const lamYou=clamp(1.6+(myAtk-oppDef)*0.13,0.15,5.5);
   const lamOpp=clamp(1.6+(oppAtk-myDef)*0.13-fit,0.12,5.0);
@@ -822,13 +830,16 @@ function creditMatch(m){
     let g=0,a=0;
     m.ev.forEach(e=>{if(e.type==="goal"&&e.side==="you"){if(e.scorerIdx===i)g++;if(e.assistIdx===i)a++;}});
     x.ref.tG+=g; x.ref.tA+=a;
-    let r=6.3+g*1.6+a*0.9+(win?0.35:draw?0:-0.3);
+    let r=6.4+g*1.5+a*0.8+(win?0.4:draw?0:-0.35);
     const grp=POS_GROUP(x.pos);
-    if(grp==="GK"||grp==="DEF") r+=(m.ga===0?0.9:m.ga===1?0.25:m.ga>=3?-0.6:0);
-    if(x.pos==="CDM") r+=(m.ga===0?0.45:m.ga>=3?-0.3:0);
-    if(x.pos==="GK") r+=(m.ga===0?0.4:0);
-    r=clamp(r+rnd(-0.25,0.25),4.5,10);
+    if(grp==="GK"||grp==="DEF"||x.pos==="CDM"){ // a clean sheet is a worldie for the back line / holding mid — rated like a goal
+      r+=m.ga===0?(x.pos==="GK"?2.0:x.pos==="CB"?1.8:1.5):m.ga===1?(x.pos==="GK"?0.8:0.6):m.ga===2?-0.1:-1.0;
+    }
+    if(x.pos==="CM") r+=(m.ga===0?0.5:m.ga>=3?-0.3:0);
+    if(x.pos==="GK") r+=(m.saves||0)*0.18;
+    r=clamp(r+rnd(-0.2,0.2),4.0,10);
     x.ref.lastMr=r; x.ref.mr.sum+=r; x.ref.mr.n++;
+    (x.ref.recent||(x.ref.recent=[])).push(r); if(x.ref.recent.length>3)x.ref.recent.shift(); // rolling last-3 (shown rating + hidden form)
   });
 }
 function applyResult(a,b,ga,gb){

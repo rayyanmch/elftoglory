@@ -122,13 +122,19 @@ const FORMATIONS = {
    spread horizontally left→right within each band. Returns copies with x,y added.
    Shared by both modes for rendering opponent line-ups on a pitch. */
 function autoXY(arr){
-  const band=p=>p.pos==="GK"?90:["CB","RB","LB","RWB","LWB"].includes(p.pos)?74:p.pos==="CDM"?61:["CM","LM","RM"].includes(p.pos)?50:p.pos==="CAM"?39:["LW","RW"].includes(p.pos)?28:18;
-  const sideOf=p=>["LB","LWB","LM","LW"].includes(p.pos)?-1:["RB","RWB","RM","RW"].includes(p.pos)?1:0;
+  const band=p=>p.pos==="GK"?90:["CB","RB","LB","RWB","LWB"].includes(p.pos)?74:p.pos==="CDM"?62:["CM","LM","RM"].includes(p.pos)?50:p.pos==="CAM"?40:["LW","RW"].includes(p.pos)?30:18;
+  const zone=p=>["LB","LWB","LM","LW"].includes(p.pos)?-1:["RB","RWB","RM","RW"].includes(p.pos)?1:0; // -1 left · 0 centre · 1 right
+  const cl=v=>Math.max(8,Math.min(92,Math.round(v)));
   const out=arr.map(p=>Object.assign({},p)), rows={};
   arr.forEach((p,i)=>{const y=band(p);(rows[y]=rows[y]||[]).push(i);});
   Object.keys(rows).forEach(y=>{
-    const idxs=rows[y].slice().sort((a,b)=>(sideOf(arr[a])-sideOf(arr[b]))||(a-b)), n=idxs.length;
-    idxs.forEach((idx,k)=>{out[idx].x=n===1?50:Math.round(13+74*k/(n-1));out[idx].y=+y;});
+    const idxs=rows[y];
+    const L=idxs.filter(i=>zone(arr[i])===-1), C=idxs.filter(i=>zone(arr[i])===0), R=idxs.filter(i=>zone(arr[i])===1);
+    L.forEach((idx,k)=>out[idx].x=cl(12+k*7));   // left-sided players hug the left touchline
+    R.forEach((idx,k)=>out[idx].x=cl(88-k*7));   // right-sided players hug the right touchline
+    const n=C.length, sp=n<=1?0:Math.min(20,46/(n-1));
+    C.forEach((idx,k)=>out[idx].x=cl(50+(k-(n-1)/2)*sp)); // central players cluster around the middle, never the wings
+    idxs.forEach(idx=>out[idx].y=+y);
   });
   return out;
 }

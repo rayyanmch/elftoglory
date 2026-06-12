@@ -1,3 +1,5 @@
 .DS_Store
 *.log
 .claude/
+_sim.js
+_*.js

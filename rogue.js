@@ -87,7 +87,7 @@ const REWARDS=[
   {id:"youth",  nm:"Youth Camp",       ico:"🌱", rar:"common", type:"instant",
    desc:"Your youngest player trains hard: +2 rating (up to potential)."},
   {id:"master", nm:"Masterclass",      ico:"📈", rar:"common", type:"instant",
-   desc:"The whole XI gains +1 rating (up to potential)."},
+   desc:"Your 5 lowest-rated starters each gain +1 rating (up to potential)."},
   {id:"doctor", nm:"Team Doctor",      ico:"❤️", rar:"common", type:"instant",
    desc:"Restore 1 heart (max 3)."},
   {id:"extend", nm:"Captain's Armband",ico:"🖋️", rar:"rare", type:"item",
@@ -159,19 +159,19 @@ const DECISIONS=[
 
 /* ---------- cups ---------- */
 const CUPS=[
-  {id:"copper",nm:"Copper Cup",ico:"🥉",after:3,diff:[0,1,2],minTier:3,rec:74,
+  {id:"copper",nm:"Copper Cup",ico:"🥉",after:3,fixed:[74,76,79],minTier:3,rec:76,
    rw:"Scouting Network 🔭 + Elite transfer pick",
    rwChips:[["🔭","Scouting Network"],["⭐","Elite player pick"]],
    apply:R=>{R.passives.scout=true;}},
-  {id:"silver",nm:"Silver Cup",ico:"🥈",after:3,diff:[2,3,4],minTier:3,rec:78,
+  {id:"silver",nm:"Silver Cup",ico:"🥈",after:3,fixed:[79,81,83],minTier:3,rec:81,
    rw:"Golden Boot 👢 (best striker +4) + Elite pick (80+)",
    rwChips:[["👢","Golden Boot — best striker +4"],["⭐","Elite pick (80+)"]],
    apply:R=>{const st=xi().filter(s=>s.p&&(s.pos==="ST"||s.pos==="RW"||s.pos==="LW")).sort((a,b)=>b.p.rating-a.p.rating)[0];if(st)up(st.p,4);}},
-  {id:"euro",nm:"Europa League",ico:"🏆",after:4,diff:[3,4,5],minTier:2,rec:83,
+  {id:"euro",nm:"Europa League",ico:"🏆",after:4,fixed:[86,88,90],minTier:2,rec:88,
    rw:"European Pedigree (whole XI +1, +1 heart) + Elite pick (85+)",
    rwChips:[["📈","Whole squad +1"],["❤️","+1 Life"],["⭐","Elite pick (85+)"]],
    apply:R=>{xi().forEach(s=>s.p&&up(s.p,1));R.hearts=Math.min(3,R.hearts+1);}},
-  {id:"ucl",nm:"Champions League",ico:"🌟",after:4,diff:[4,5,6],minTier:1,rec:86,
+  {id:"ucl",nm:"Champions League",ico:"🌟",after:4,fixed:[89,91,93],minTier:1,rec:91,
    rw:"Galáctico pick (top-20 player!) + Potential Unlock 💎 + 1 heart",
    rwChips:[["🌌","Galáctico — a Top-20 star"],["💎","Potential Unlock"],["❤️","+1 Life"]],
    apply:R=>{R.hearts=Math.min(3,R.hearts+1);R.pendingUnlock=true;}}];
@@ -190,6 +190,9 @@ function potOf(rating,age,name){
   if(rating>=93)pot=Math.max(pot,99); else if(rating>=90)pot=Math.max(pot,rating+4); else if(rating>=87)pot=Math.max(pot,rating+3);
   return Math.min(99,Math.max(rating+2,pot));
 }
+const FREE_AGENTS=[ // not attached to any club, but in the transfer/youngster pool
+  {name:"Pato Rivas",rating:79,pos:["CB","CDM"],age:19,potential:87},
+];
 function buildPool(){
   if(ALL)return true;
   const packs=[["BUN",window.CLUBS_BUN],["ESP",window.CLUBS_ESP],["FRA",window.CLUBS_FRA],["ENG",window.CLUBS_ENG]];
@@ -202,6 +205,9 @@ function buildPool(){
     club.xi=clubXI(ps); club.ovr=Math.round(club.xi.reduce((a,p)=>a+p.rating,0)/club.xi.length);
     clubs.push(club); players.push(...ps);
   }));
+  FREE_AGENTS.forEach(f=>players.push({name:f.name,rating:f.rating,base:f.rating,pos:f.pos.slice(),age:f.age,
+    potential:f.potential||potOf(f.rating,f.age,f.name),club:"No club",clubShort:"FA",league:"FA",tier:4,
+    kit:{p:"#262b36",s:"#d7deec",t:"#d7deec"},mr:{sum:0,n:0},recent:[],tG:0,tA:0}));
   ALL={clubs,players};
   return true;
 }
@@ -210,7 +216,7 @@ function clubXI(ps){ // 1 GK + 10 best outfielders, roughly position-aware
   const rest=ps.filter(p=>p.pos[0]!=="GK").sort((a,b)=>b.rating-a.rating).slice(0,10);
   return [...(gk?[gk]:[]),...rest];
 }
-function clone(p){return {...p,pos:p.pos.slice(),base:p.base,rating:p.base,mr:{sum:0,n:0},tG:0,tA:0,tmp:0,capt:false};}
+function clone(p){return {...p,pos:p.pos.slice(),base:p.base,rating:p.base,mr:{sum:0,n:0},recent:[],tG:0,tA:0,tmp:0,capt:false};}
 
 /* ---------- run state ---------- */
 let R=null,L=null,wired=false;
@@ -365,8 +371,8 @@ function jerseyHTML(s,i){
   if(!s.p)return `<div class="jersey empty"><span class="emptypos">${s.pos}</span><span class="emptyplus">+</span></div>`;
   const p=s.p,t=tierOf(p.rating);
   const cur=clamp((p.rating-50)/49,0,1)*100,pot=clamp((p.potential-50)/49,0,1)*100;
-  const avg=p.mr.n?(p.mr.sum/p.mr.n):0;
-  const mr=p.mr.n?`<span class="jmr ${avg>=8?"hi":avg>=7?"mid":avg>=6?"ok":"low"}">${avg.toFixed(1)}</span>`:"";
+  const rec=p.recent||[],ravg=rec.length?rec.reduce((a,b)=>a+b,0)/rec.length:0;
+  const mr=rec.length?`<span class="jmr ${ravg>=8?"hi":ravg>=7?"mid":ravg>=6?"ok":"low"}" title="Avg rating, last ${rec.length} match${rec.length>1?"es":""}">${ravg.toFixed(1)}</span>`:"";
   const ga=(p.tG||p.tA)?`<div class="jga">${p.tG?`<span class="ga-g">⚽${p.tG}</span>`:""}${p.tA?`<span class="ga-a">👟${p.tA}</span>`:""}</div>`:"";
   const boost=p.tmp?`<span class="rg-boost ${p.tmp>0?"up":"dn"}">${p.tmp>0?"+":""}${p.tmp}</span>`:"";
   return `<div class="jersey tier-${t}" title="${p.name} · ex ${p.clubShort||p.club}">
@@ -410,8 +416,8 @@ function roadmapHTML(){
 function genOffers(){
   const mo=myOVR();
   const g=R.games; // progressive: forgiving onboarding, then the league heats up as you establish
-  // wider spread (real easy/fair/risky choice) + a floor that RISES to ~even over time so you can't safely grind forever
-  const band=g<4?[-4,-1,2]:g<9?[-3,1,4]:g<15?[-2,2,5]:g<22?[-1,3,6]:[0,4,7];
+  // forgiving onboarding, then a gently rising floor so the easy pick stops being a free win as you establish
+  const band=g<4?[-4,-2,0]:g<9?[-3,-1,2]:g<16?[-1,1,4]:[0,2,5];
   const offs=band.map(off=>{
     let pool=ALL.clubs.filter(c=>R.games<5?c.tier>=3:true);
     pool=pool.filter(c=>!(R.offers||[]).some(o=>o&&o.name===c.name));
@@ -524,15 +530,32 @@ function maybeInvite(){
   if(R.finalPending&&R.finalCounter<=0){showFinalInvite();return;}
   if(R.cupIdx<CUPS.length&&R.cupCounter<=0)showInvite(CUPS[R.cupIdx],R.cupDeclined||false);
 }
+function assembledXI(target){ // a side of REAL stars at ~the target rating; for high targets they play up toward their potential
+  const used=new Set(),out=[];
+  const eff=p=>Math.min(p.potential,Math.max(p.rating,target)); // a real player fielding up to the station level, capped by his ceiling
+  SLOTS.forEach(s=>{
+    const elig=ALL.players.filter(p=>!used.has(p.name)&&(ACC[s.pos]||[]).some(c=>p.pos.includes(c)));
+    let best=null,bd=1e9,br=0;
+    elig.forEach(p=>{const r=eff(p),d=Math.abs(r-target);if(d<bd||(d===bd&&r>br)){bd=d;br=r;best=p;}});
+    if(best){used.add(best.name);out.push({name:best.name,sur:surname(best.name),rating:eff(best),pos:s.pos});}
+  });
+  return out;
+}
 function cupOpp(def,stageIdx){
-  const target=myOVR()+def.diff[stageIdx];
+  const V=def.fixed[stageIdx];                       // FIXED station strength — NO scaling to the player
   let pool=ALL.clubs;
   if(def.id==="copper")pool=ALL.clubs.filter(c=>c.tier>=3);          // lower-league clubs only
-  if(def.id==="silver")pool=ALL.clubs.filter(c=>c.tier===2||c.tier===3); // mid clubs — never the tier-1 elite you'd face in the CL
+  if(def.id==="silver")pool=ALL.clubs.filter(c=>c.tier===2||c.tier===3);
   if(def.id==="euro")pool=ALL.clubs.filter(c=>c.tier<=2);
   if(def.id==="ucl")pool=ALL.clubs.filter(c=>c.tier===1);
   const faced=new Set((R.cup&&R.cup.faced)||[]); const unfaced=pool.filter(c=>!faced.has(c.name)); if(unfaced.length)pool=unfaced;
-  const near=pool.slice().sort((a,b)=>Math.abs(a.ovr-target)-Math.abs(b.ovr-target)).slice(0,6);
+  // station strength above any real club this cup can field → assemble a real-star side AT that fixed rating (CL = galácticos)
+  const maxOvr=Math.max.apply(null,pool.map(c=>c.ovr));
+  if(V>maxOvr){
+    const xs=assembledXI(V);
+    if(xs.length===11)return {name:def.id==="ucl"?"GALÁCTICOS XI ★":"ALL-STARS ✦",kit:{p:"#0b1020",s:"#ffd700",t:"#ffd700"},ovr:Math.round(xs.reduce((a,p)=>a+p.rating,0)/11),tier:1,league:"World",special:true,xi:xs};
+  }
+  const near=pool.slice().sort((a,b)=>Math.abs(a.ovr-V)-Math.abs(b.ovr-V)).slice(0,6);
   return pick(near);
 }
 function showInvite(def,redo){
@@ -569,6 +592,14 @@ function allStarXI(byPotential){
   });
   return out;
 }
+function eliteXI(){ // a varied galáctico side (random among each slot's top real options) — strong, below the absolute All-Stars
+  const used=new Set(),out=[];
+  SLOTS.forEach(s=>{
+    const cands=ALL.players.filter(p=>!used.has(p.name)&&(ACC[s.pos]||[]).some(c=>p.pos.includes(c))).sort((a,b)=>b.rating-a.rating).slice(0,3);
+    const p=pick(cands)||cands[0]; if(p){used.add(p.name);out.push({name:p.name,sur:surname(p.name),rating:p.rating,pos:s.pos});}
+  });
+  return out;
+}
 function finalOpp(stage){
   if(stage===0){const c=R.uclFinalOpp||pick(ALL.clubs.filter(x=>x.tier===1));return {name:c.name+" (Revenge)",kit:c.kit,ovr:c.ovr+1,tier:1,league:c.league,xi:c.xi.map(p=>({name:p.name,sur:surname(p.name),rating:p.rating,pos:p.pos[0]})),special:false};}
   if(stage===1){const xs=allStarXI(false);return {name:"WORLD ALL-STARS ★",kit:{p:"#101418",s:"#ffd700",t:"#ffd700"},ovr:Math.round(xs.reduce((a,p)=>a+p.rating,0)/11),tier:1,special:true,xi:xs};}
@@ -583,9 +614,15 @@ function matchPitchHTML(arr,who,kit){
     ${arr.map((p,i)=>`<div class="mxj tier-${tierOf(p.rating)}" data-${di}="${i}" style="left:${p.x}%;top:${p.y}%">
       <div class="mxj-kit">${kitSVG(kit,p.rating)}</div><span class="mxj-nm">${p.sur}</span><span class="mx-ico"></span></div>`).join("")}</div>`;
 }
+// HIDDEN form: a player's last-3 match ratings nudge how he performs next game (hot → more likely to do things, cold → less). Never shown.
+function formOf(p){
+  const rec=p&&p.recent||[]; if(rec.length<2)return {adj:0,mul:1};
+  const d=rec.reduce((a,b)=>a+b,0)/rec.length-6.8;
+  return {adj:clamp(d*0.55,-1.6,2.2), mul:clamp(1+d*0.14,0.6,1.7)};
+}
 function startMatch(opp,ctx){
   R.phase="match";
-  const mine=xi().filter(s=>s.p).map(s=>({name:s.p.name,sur:surname(s.p.name),rating:s.p.rating+(s.p.tmp||0),pos:s.pos,x:s.x,y:s.y,ref:s.p}));
+  const mine=xi().filter(s=>s.p).map(s=>{const f=formOf(s.p);return {name:s.p.name,sur:surname(s.p.name),rating:s.p.rating+(s.p.tmp||0),pos:s.pos,x:s.x,y:s.y,ref:s.p,fAdj:f.adj,fMul:f.mul};});
   const ox=oppXIof(opp);
   let oAtk=(()=>{let w=0,v=0;ox.forEach(p=>{const a=AW[p.pos]||0;v+=p.rating*a;w+=a;});return v/w;})();
   let oDef=(()=>{let w=0,v=0;ox.forEach(p=>{const d=DW[p.pos]||0;v+=p.rating*d;w+=d;});return v/w;})();
@@ -595,9 +632,6 @@ function startMatch(opp,ctx){
   const myAvg=mine.reduce((a,p)=>a+p.rating,0)/Math.max(1,mine.length);
   const myOvr=Math.round(myAvg),myAtkR=Math.round(wAvg(mine,AW)+standoutBonus(mine,AW,myAvg)),myDefR=Math.round(wAvg(mine,DW)+standoutBonus(mine,DW,myAvg));
   const oOvr=opp.ovr||Math.round(oAvg);
-  // cups: a weaker real club "raises its game" up to the cup's intended difficulty (myOVR+diff) so a maxed team still gets a contest
-  let oOvrShown=oOvr;
-  if(ctx.cup&&ctx.cup.def&&ctx.cup.def.diff){const tgt=myOvr+(ctx.cup.def.diff[ctx.cup.stage]||0);if(oOvr<tgt){const k=tgt/Math.max(1,oOvr);oAtk*=k;oDef*=k;oOvrShown=tgt;}}
   L={opp,ctx,mine,ox,oAtk,oDef,min:0,gf:0,ga:0,phil:"bal",foc:"bal",ev:[],offMine:new Set(),offOpp:new Set(),
      aiNote:false,timer:null,saves:0,done:false};
   mount(`<section class="screen match rg-match">
@@ -612,7 +646,7 @@ function startMatch(opp,ctx){
         <div class="ms-scorers" data-sc-you></div>
         ${matchPitchHTML(mine,"you",kitOf())}</div>
       <div class="mmid"><div class="mshoot" data-shoot></div><div class="mfeed" data-feed></div></div>
-      <div class="mside opp"><div class="ms-head"><div class="ms-flag">${opp.special?"✦":"🏟️"}</div><div class="ms-nm-wrap"><div class="ms-name">${opp.name}</div><div class="ms-stats">OVR <b>${oOvrShown}</b> · <span class="st-a">ATK ${Math.round(oAtk)}</span> · <span class="st-d">DEF ${Math.round(oDef)}</span></div></div><div class="ms-score" data-ga>0</div></div>
+      <div class="mside opp"><div class="ms-head"><div class="ms-flag">${opp.special?"✦":"🏟️"}</div><div class="ms-nm-wrap"><div class="ms-name">${opp.name}</div><div class="ms-stats">OVR <b>${oOvr}</b> · <span class="st-a">ATK ${Math.round(oAtk)}</span> · <span class="st-d">DEF ${Math.round(oDef)}</span></div></div><div class="ms-score" data-ga>0</div></div>
         <div class="ms-scorers" data-sc-opp></div>
         ${matchPitchHTML(autoXY(ox),"opp",opp.kit)}</div>
     </div>
@@ -625,13 +659,15 @@ function startMatch(opp,ctx){
 }
 function myEff(){
   let aw=0,as=0,dw=0,ds=0;
-  L.mine.forEach((p,i)=>{if(L.offMine.has(i))return;const a=AW[p.pos]||0,d=DW[p.pos]||0;as+=p.rating*a;aw+=a;ds+=p.rating*d;dw+=d;});
+  const eff=p=>p.rating+(p.fAdj||0);                  // hidden form baked into the effective rating (display stays form-less)
+  const on=[];
+  L.mine.forEach((p,i)=>{if(L.offMine.has(i))return;const r=eff(p),a=AW[p.pos]||0,d=DW[p.pos]||0;as+=r*a;aw+=a;ds+=r*d;dw+=d;on.push({pos:p.pos,rating:r});});
   let atk=as/Math.max(.1,aw),def=ds/Math.max(.1,dw);
   // a standout who outshines the squad lifts attack / shores up defence
-  const onp=L.mine.filter((p,i)=>!L.offMine.has(i)),avg=onp.reduce((s,p)=>s+p.rating,0)/Math.max(1,onp.length);
-  atk+=standoutBonus(onp,AW,avg); def+=standoutBonus(onp,DW,avg);
+  const avg=on.reduce((s,p)=>s+p.rating,0)/Math.max(1,on.length);
+  atk+=standoutBonus(on,AW,avg); def+=standoutBonus(on,DW,avg);
   // focus asymmetry bonus (hidden)
-  const g=grp=>{const v=L.mine.filter((p,i)=>!L.offMine.has(i)&&grp.includes(p.pos));return v.length?v.reduce((a,p)=>a+p.rating,0)/v.length:0;};
+  const g=grp=>{const v=on.filter(p=>grp.includes(p.pos));return v.length?v.reduce((a,p)=>a+p.rating,0)/v.length:0;};
   const wAtt=g(["LW","RW","LM","RM","LB","RB","LWB","RWB"]),cAtt=g(["ST","CAM","CM"]);
   const wDef=g(["LB","RB","LWB","RWB"]),cDef=g(["CB","CDM"]);
   if(L.foc==="wings"){atk+=clamp(wAtt-cAtt,-6,6)*0.9;def+=clamp(wDef-cDef,-6,6)*0.9;}
@@ -653,11 +689,11 @@ function pPerMin(){
 }
 function scorerIdx(arr,off,wf){const c=arr.map((_,i)=>i).filter(i=>arr[i].pos!=="GK"&&!off.has(i));return c.length?wpick(c,i=>wf(arr[i])):-1;}
 function focusW(p,base){
-  let w=Math.pow(base[p.pos]||0.05,1.5)*Math.pow(p.rating,2.0);
+  let w=Math.pow(base[p.pos]||0.05,1.5)*Math.pow(p.rating+(p.fAdj||0),2.0);
   const wide=["LW","RW","LM","RM","LB","RB","LWB","RWB"].includes(p.pos);
   if(L.foc==="wings"&&wide)w*=1.8;
   if(L.foc==="centre"&&!wide&&p.pos!=="GK")w*=1.6;
-  return w;
+  return w*(p.fMul||1); // hidden form: in-form players get the ball / chances more
 }
 function markIco(side,idx,kind){
   const cell=q(`.mside.${side} [data-${side==="you"?"mi":"oi"}="${idx}"] .mx-ico`); if(!cell)return;
@@ -668,7 +704,7 @@ function goal(side){
   const arr=side==="you"?L.mine:L.ox,off=side==="you"?L.offMine:L.offOpp;
   const si=scorerIdx(arr,off,p=>focusW(p,AW)); if(si<0)return;
   const pen=Math.random()<0.11; let ai=-1;
-  if(!pen&&Math.random()<0.72){const c=arr.map((_,i)=>i).filter(i=>i!==si&&arr[i].pos!=="GK"&&!off.has(i));if(c.length)ai=wpick(c,i=>Math.pow(CW[arr[i].pos]||0.05,1.2)*Math.pow(arr[i].rating,1.6));}
+  if(!pen&&Math.random()<0.72){const c=arr.map((_,i)=>i).filter(i=>i!==si&&arr[i].pos!=="GK"&&!off.has(i));if(c.length)ai=wpick(c,i=>Math.pow(CW[arr[i].pos]||0.05,1.2)*Math.pow(arr[i].rating+(arr[i].fAdj||0),1.6)*(arr[i].fMul||1));}
   if(side==="you"){L.gf++;bump("[data-gf]",L.gf);}else{L.ga++;bump("[data-ga]",L.ga);}
   L.ev.push({min:L.min,side,si,ai,pen});
   const chip=q(side==="you"?"[data-sc-you]":"[data-sc-opp]");
@@ -731,13 +767,16 @@ function creditAndDevelop(win,draw){
   L.mine.forEach((p,i)=>{
     let g=0,a=0;L.ev.forEach(e=>{if(e.side==="you"){if(e.si===i)g++;if(e.ai===i)a++;}});
     const ref=p.ref; ref.tG+=g; ref.tA+=a;
-    let r=6.3+g*1.6+a*0.9+(win?0.35:draw?0:-0.3);
-    const defish=["GK","CB","RB","LB","RWB","LWB"].includes(p.pos);
-    if(defish)r+=(L.ga===0?0.9:L.ga===1?0.25:L.ga>=3?-0.6:0);
-    if(p.pos==="CDM")r+=(L.ga===0?0.45:L.ga>=3?-0.3:0);
-    if(p.pos==="GK")r+=(L.ga===0?0.4:0)+L.saves*0.15;
-    r=clamp(r+rnd(-0.25,0.25),4.5,10);
+    let r=6.4+g*1.5+a*0.8+(win?0.4:draw?0:-0.35);
+    const back=["GK","CB","RB","LB","RWB","LWB"].includes(p.pos);
+    if(back||p.pos==="CDM"){ // a clean sheet is a worldie for the back line / holding mid — rated like a goal
+      r+=L.ga===0?(p.pos==="GK"?2.0:p.pos==="CB"?1.8:1.5):L.ga===1?(p.pos==="GK"?0.8:0.6):L.ga===2?-0.1:-1.0;
+    }
+    if(p.pos==="CM")r+=(L.ga===0?0.5:L.ga>=3?-0.3:0); // central mids share some defensive credit
+    if(p.pos==="GK")r+=L.saves*0.18;                  // keepers also rewarded for saves
+    r=clamp(r+rnd(-0.2,0.2),4.0,10);
     ref.lastMr=r; ref.mr.sum+=r; ref.mr.n++;
+    (ref.recent||(ref.recent=[])).push(r); if(ref.recent.length>3)ref.recent.shift(); // rolling last-3 (the shown rating + hidden form)
     // development (rating only; potential fixed)
     const from=ref.rating,gap=ref.potential-ref.rating,perf=r;
     if(gap>0){
@@ -783,7 +822,7 @@ function finishMatch(){
         if(def.apply)def.apply(R);
         R.cupIdx=Math.min(R.cupIdx+1,CUPS.length);
         R.cupCounter=R.cupIdx<CUPS.length?CUPS[R.cupIdx].after:9999;
-        const eliteMin=def.id==="copper"?myOVR()+4:def.id==="silver"?Math.max(80,myOVR()+4):def.id==="euro"?Math.max(85,myOVR()+3):0;
+        const eliteMin=def.id==="copper"?myOVR()+1:def.id==="silver"?Math.max(80,myOVR()+3):def.id==="euro"?Math.max(85,myOVR()+3):0;
         growthPopup(changes,()=>cupWonOverlay(def,()=>{
           const opts=def.id==="ucl"?{top20:true,count:R.passives.scout?6:5}:{eliteMin,count:R.passives.scout?6:5};
           transferWindow(beaten,opts,()=>{
@@ -833,23 +872,40 @@ function cupWonOverlay(def,cb){
 function transferCandidates(beaten,opts){
   const n=opts.count||5, out=[], used=new Set(xi().filter(s=>s.p).map(s=>s.p.name));
   const myo=myOVR(), mag=R.passives.magnet?1:0;
-  // 2 from the beaten club (if it's a real club)
-  const bc=ALL.clubs.find(c=>c.name===(beaten.name||"").replace(" (Revenge)",""));
+  const free=()=>ALL.players.filter(p=>!used.has(p.name));
+  const add=p=>{if(p){out.push(p);used.add(p.name);}};
+  // ---- up to 3 from the beaten club: best by rating, best by potential, then a good one at another position ----
+  const bc=ALL.clubs.find(c=>c.name===((beaten&&beaten.name)||"").replace(" (Revenge)",""));
   if(bc){
-    const cands=bc.players.filter(p=>!used.has(p.name));
-    cands.sort((a,b)=>b.rating-a.rating);
-    cands.slice(0,6).sort(()=>Math.random()-0.5).slice(0,2).forEach(p=>{out.push(p);used.add(p.name);});
+    let av=bc.players.filter(p=>!used.has(p.name));
+    // 3 GOOD players from the beaten club — always from its top 5 by rating/potential, weighted toward the best but not always the #1
+    const wtop=key=>{const pool=av.slice().sort((a,b)=>((b[key]||b.rating)-(a[key]||a.rating))).slice(0,5);if(!pool.length)return null;const mn=Math.min.apply(null,pool.map(p=>p[key]||p.rating));return wpick(pool,x=>(x[key]||x.rating)-mn+1);};
+    const grab=p=>{if(p){add(p);av=av.filter(x=>x.name!==p.name);}};
+    grab(wtop("rating"));        // a top-5 by rating (not always the #1)
+    grab(wtop("potential"));     // a top-5 by potential
+    const taken=new Set(out.map(p=>p.pos[0]));
+    const good=av.slice().sort((a,b)=>Math.max(b.rating,b.potential||0)-Math.max(a.rating,a.potential||0)).slice(0,5);
+    const diff=good.filter(p=>!taken.has(p.pos[0])), pool3=diff.length?diff:good;
+    if(pool3.length){const mn=Math.min.apply(null,pool3.map(p=>p.rating));grab(wpick(pool3,x=>x.rating-mn+1));} // another good one, ideally a different position
   }
-  let pool;
-  if(opts.top20){pool=ALL.players.filter(p=>!used.has(p.name)).sort((a,b)=>b.rating-a.rating).slice(0,20);}
-  else if(opts.eliteMin){pool=ALL.players.filter(p=>!used.has(p.name)&&p.rating>=opts.eliteMin);}
-  else{const oppO=(beaten&&beaten.ovr)||myo;const mb=Math.min(2,Math.max(0,(opts.margin||1)-1));const lo=myo-1+mag,hi=Math.min(Math.max(myo+3,oppO+2)+mag+mb,89);pool=ALL.players.filter(p=>!used.has(p.name)&&p.rating>=lo&&p.rating<=hi);}
-  if(!pool.length)pool=ALL.players.filter(p=>!used.has(p.name));
-  // position balancing: the data has many more CBs than RBs etc. — weight rarer positions up
-  const posN={}; pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
-  while(out.length<n&&pool.length){
-    const p=wpick(pool,x=>(x.rating>=myo+2?3:1)/Math.sqrt(posN[x.pos[0]]||1));
-    out.push(p);used.add(p.name);pool=pool.filter(x=>!used.has(x.name));
+  // ---- remaining slots ----
+  if(opts.top20){ // galáctico cup window
+    let pool=free().sort((a,b)=>b.rating-a.rating).slice(0,20); const posN={};pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
+    while(out.length<n&&pool.length){add(wpick(pool,x=>1/Math.sqrt(posN[x.pos[0]]||1)));pool=pool.filter(x=>!used.has(x.name));}
+  } else if(opts.eliteMin){ // cup elite window
+    let pool=free().filter(p=>p.rating>=opts.eliteMin); if(!pool.length)pool=free(); const posN={};pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
+    while(out.length<n&&pool.length){add(wpick(pool,x=>(x.rating>=myo+2?2:1)/Math.sqrt(posN[x.pos[0]]||1)));pool=pool.filter(x=>!used.has(x.name));}
+  } else { // NORMAL league window — mostly journeymen AT/BELOW your level; a genuinely strong player is RARE (~1 in 10 slots), not myo+x every game
+    const nLo=Math.max(56,myo-9)+mag, nHi=Math.max(nLo,myo-1+mag); let guard=0;
+    while(out.length<n&&guard++<40){
+      const gem=Math.random()<0.10;
+      let band=free().filter(p=>p.rating>=(gem?myo+mag:nLo)&&p.rating<=(gem?myo+2+mag:nHi));
+      if(!band.length)band=free().filter(p=>p.rating>=nLo&&p.rating<=nHi);
+      if(!band.length)band=free(); if(!band.length)break;
+      const posN={};band.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
+      // good players late come via POTENTIAL, not flat ratings → weight young high-upside prospects (sub-OVR now, grow later) up
+      add(wpick(band,x=>{const gap=Math.max(0,(x.potential||x.rating)-x.rating),youth=x.age<=20?1:x.age<=23?0.6:x.age<=26?0.25:0;return (1+gap*youth*0.5)/Math.sqrt(posN[x.pos[0]]||1);}));
+    }
   }
   return out.sort(()=>Math.random()-0.5);
 }
@@ -902,7 +958,7 @@ function applyReward(r){
   switch(r.id){
     case "drink":R.items.push("drink");toast("⚡ Energy Drink stored");break;
     case "youth":{const y=xi().filter(s=>s.p).sort((a,b)=>a.p.age-b.p.age)[0];if(y){up(y.p,2);toast(`🌱 ${surname(y.p.name)} +2`);}break;}
-    case "master":xi().forEach(s=>s.p&&up(s.p,1));toast("📈 Whole XI +1");break;
+    case "master":{const low=xi().filter(s=>s.p).sort((a,b)=>a.p.rating-b.p.rating).slice(0,5);low.forEach(s=>up(s.p,1));toast("📈 Your 5 weakest starters +1");break;}
     case "doctor":R.hearts=Math.min(3,R.hearts+1);toast("❤️ Heart restored");break;
     case "extend":R.items.push("extend");toast("🖋️ Captain's Armband stored — use it from Items");break;
     case "setp":R.passives.setp=true;toast("🎯 Set-Piece Coach hired");break;
