@@ -90,7 +90,7 @@ const REWARDS=[
    desc:"Your 5 lowest-rated starters each gain +1 rating (up to potential)."},
   {id:"doctor", nm:"Team Doctor",      ico:"❤️", rar:"common", type:"instant",
    desc:"Restore 1 heart (max 3)."},
-  {id:"extend", nm:"Captain's Armband",ico:"🖋️", rar:"rare", type:"item",
+  {id:"extend", nm:"Captain's Armband",ico:"🖋️", rar:"rare", type:"item", w:0.5,
    desc:"Pick a player: +2 now and a permanent growth boost."},
   {id:"setp",   nm:"Set-Piece Coach",  ico:"🎯", rar:"rare", type:"passive",
    desc:"Permanent: your goal chances +6%."},
