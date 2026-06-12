@@ -902,11 +902,14 @@ function transferCandidates(beaten,opts){
   } else if(opts.eliteMin){ // cup elite window
     let pool=free().filter(p=>p.rating>=opts.eliteMin); if(!pool.length)pool=free(); const posN={};pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
     while(out.length<n&&pool.length){add(wpick(pool,x=>(x.rating>=myo+2?2:1)/Math.sqrt(posN[x.pos[0]]||1)));pool=pool.filter(x=>!used.has(x.name));}
-  } else { // NORMAL league window — mostly journeymen AT/BELOW your level; a genuinely strong player is RARE (~1 in 10 slots), not myo+x every game
-    const nLo=Math.max(56,myo-9)+mag, nHi=Math.max(nLo,myo-1+mag); let guard=0;
+  } else { // NORMAL league window — pool reaches a bit ABOVE your level early (so you can build up), then tightens late so strong players stay rare (anti-snowball)
+    const head=myo<=77?1:myo<=83?0:-1;             // how far above your OVR the everyday pool reaches: early +1 → mid 0 → late -1
+    const nLo=Math.max(56,myo-9)+mag, nHi=Math.max(nLo,myo+head+mag);
+    const gemLo=myo+head+mag, gemHi=myo+head+2+mag; // the rare strong pick reaches a touch higher still (early ~myo+3, late ~myo+1)
+    let guard=0;
     while(out.length<n&&guard++<40){
       const gem=Math.random()<0.10;
-      let band=free().filter(p=>p.rating>=(gem?myo+mag:nLo)&&p.rating<=(gem?myo+2+mag:nHi));
+      let band=free().filter(p=>p.rating>=(gem?gemLo:nLo)&&p.rating<=(gem?gemHi:nHi));
       if(!band.length)band=free().filter(p=>p.rating>=nLo&&p.rating<=nHi);
       if(!band.length)band=free(); if(!band.length)break;
       const posN={};band.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
