@@ -102,8 +102,8 @@ const REWARDS=[
    desc:"Permanent: your keeper grows a halo — opponent chances −8%."},
   {id:"scout",  nm:"Scouting Network", ico:"🔭", rar:"epic", type:"passive",
    desc:"Permanent: transfer windows reveal 6 players instead of 5."},
-  {id:"unlock", nm:"Potential Unlock", ico:"💎", rar:"epic", type:"item",
-   desc:"Pick a player: jumps straight to full potential."}];
+  {id:"unlock", nm:"Potential Unlock", ico:"💎", rar:"epic", type:"item", w:0.8,
+   desc:"Pick a player: +5 rating (up to potential)."}];
 const RARW={common:60,rare:30,epic:10};
 
 /* ---------- decisions (between matches) ---------- */
@@ -355,7 +355,7 @@ function heartsHTML(){
 }
 function boostPromptHTML(){
   if(R.boostTarget==null)return "";
-  const m={unlock:["💎","Potential Unlock","Tap a player → jump him to full potential."],
+  const m={unlock:["💎","Potential Unlock","Tap a player → +5 rating (up to potential)."],
            extend:["🖋️","Captain's Armband","Tap a player → make him captain (+2 & growth)."],
            drink:["⚡","Energy Drink","Tap a player → boost him +4 for the next match."]};
   const a=m[R.boostTarget]||["✨","Action ready","Tap a player to use it."];
@@ -829,9 +829,11 @@ function finishMatch(){
         if(def.apply)def.apply(R);
         R.cupIdx=Math.min(R.cupIdx+1,CUPS.length);
         R.cupCounter=R.cupIdx<CUPS.length?CUPS[R.cupIdx].after:9999;
-        const eliteMin=def.id==="copper"?myOVR()+1:def.id==="silver"?Math.max(80,myOVR()+3):def.id==="euro"?Math.max(85,myOVR()+3):0;
+        const eliteMin=def.id==="copper"?Math.max(82,myOVR()):def.id==="silver"?Math.max(80,myOVR()+3):def.id==="euro"?Math.max(85,myOVR()+3):0;
         growthPopup(changes,()=>cupWonOverlay(def,()=>{
-          const opts=def.id==="ucl"?{top20:true,count:R.passives.scout?6:5}:{eliteMin,count:R.passives.scout?6:5};
+          const opts=def.id==="ucl"?{top20:true,count:R.passives.scout?6:5}
+            :def.id==="copper"?{eliteMin,eliteCap:85,lucky:[86,89],luckyProb:0.05,count:R.passives.scout?6:5} // Copper: a good ~84-85 player regularly, an elite (86-89) only on a rare lucky window
+            :{eliteMin,count:R.passives.scout?6:5};
           transferWindow(beaten,opts,()=>{
             const finish=()=>{R.offers=null;if(def.id==="ucl")showFinalInvite();else mountHub();};
             if(R.pendingUnlock){R.pendingUnlock=false;R.items.push("unlock");toast("💎 Potential Unlock added to your Items");}
@@ -899,9 +901,17 @@ function transferCandidates(beaten,opts){
   if(opts.top20){ // galáctico cup window
     let pool=free().sort((a,b)=>b.rating-a.rating).slice(0,20); const posN={};pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
     while(out.length<n&&pool.length){add(wpick(pool,x=>1/Math.sqrt(posN[x.pos[0]]||1)));pool=pool.filter(x=>!used.has(x.name));}
-  } else if(opts.eliteMin){ // cup elite window
-    let pool=free().filter(p=>p.rating>=opts.eliteMin); if(!pool.length)pool=free(); const posN={};pool.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
-    while(out.length<n&&pool.length){add(wpick(pool,x=>(x.rating>=myo+2?2:1)/Math.sqrt(posN[x.pos[0]]||1)));pool=pool.filter(x=>!used.has(x.name));}
+  } else if(opts.eliteMin){ // cup elite window — optional ceiling (eliteCap) + a rare "lucky" higher band (used by Copper)
+    const cap=opts.eliteCap||999, lk=opts.lucky, lp=opts.luckyProb||0; let guard=0;
+    while(out.length<n&&guard++<40){
+      let lo=opts.eliteMin, hi=cap;
+      if(lk&&Math.random()<lp){lo=lk[0];hi=lk[1];}
+      let band=free().filter(p=>p.rating>=lo&&p.rating<=hi);
+      if(!band.length)band=free().filter(p=>p.rating>=opts.eliteMin);
+      if(!band.length)band=free(); if(!band.length)break;
+      const posN={};band.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
+      add(wpick(band,x=>(x.rating>=myo+2?2:1)/Math.sqrt(posN[x.pos[0]]||1)));
+    }
   } else { // NORMAL league window — pool reaches a bit ABOVE your level early (so you can build up), then tightens late so strong players stay rare (anti-snowball)
     const head=myo<=77?1:myo<=83?0:-1;             // how far above your OVR the everyday pool reaches: early +1 → mid 0 → late -1
     const nLo=Math.max(56,myo-9)+mag, nHi=Math.max(nLo,myo+head+mag);
@@ -955,7 +965,7 @@ function rollRewards(margin){
   const avail=REWARDS.filter(r=>!(r.type==="passive"&&R.passives[r.id==="setp"?"setp":r.id]));
   const out=[];
   while(out.length<3){
-    const r=wpick(avail,x=>RARW[x.rar]*lux(x));
+    const r=wpick(avail,x=>RARW[x.rar]*(x.w||1)*lux(x));
     if(!out.includes(r))out.push(r);
   }
   return out;
@@ -980,7 +990,7 @@ function applyReward(r){
   }
 }
 function applyTarget(kind,p){
-  if(kind==="unlock"){const f=p.rating;p.rating=p.potential;toast(`💎 ${surname(p.name)} ${f} → ${p.rating}`);}
+  if(kind==="unlock"){const f=p.rating;p.rating=Math.min(p.potential,p.rating+5);toast(`💎 ${surname(p.name)} ${f} → ${p.rating}`);}
   if(kind==="extend"){xi().forEach(s=>{if(s.p)s.p.capt=false;});p.capt=true;up(p,2);p.growthBoost=true;toast(`🖋️ ${surname(p.name)} is your captain`);}
   if(kind==="drink"){p.tmp=(p.tmp||0)+4;toast(`⚡ ${surname(p.name)} +4 next match`);}
 }
@@ -1062,7 +1072,7 @@ function act(r,v,btn){
     case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);}break;
     case "skip":skip();break;
     case "cont":finishMatch();break;
-    case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player to unlock his potential"};toast(m[id]);refreshHub();}break;}
+    case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player for +5 rating (up to potential)"};toast(m[id]);refreshHub();}break;}
     case "tpick":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;if(btn&&btn.disabled)break;const p=rp.cands[+v];const cb=rp.cb;R.rp=null;placeSigning(clone(p),cb);break;}
     case "tskip":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;const cb=rp.cb;R.rp=null;if(cb)cb();else refreshHub();break;}
     case "rpick":{const rp=R.rp;if(!rp||rp.kind!=="reward")break;const r=rp.opts[+v];const cb=rp.cb;R.rp=null;applyReward(r);if(cb)cb();else refreshHub();break;}
