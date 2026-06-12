@@ -225,7 +225,7 @@ function fresh(){return {phase:"create",club:{name:"FC Phoenix",crest:4},formati
   hearts:3,items:[],passives:{scout:false,gkaura:false,setp:false,iron:false,magnet:false},
   trophies:[],wdl:{w:0,d:0,l:0},games:0,road:[],offers:null,
   cupIdx:0,cupCounter:CUPS[0].after,cup:null,uclFinalOpp:null,glory:false,
-  swapFrom:null,boostTarget:null,pendingUnlock:false,finalPending:false,finalCounter:0,totGF:0,totGA:0};}
+  swapFrom:null,boostTarget:null,pendingUnlock:false,finalPending:false,finalCounter:0,totGF:0,totGA:0,phil:"bal",foc:"bal"};}
 const kitOf=()=>{const c=CRESTS[R.club.crest];return {p:c.p,s:c.s,t:c.t};};
 const xi=()=>R.slots;
 function setFormation(key){if(!FORMATIONS[key])return;R.formation=key;R.slots=FORMATIONS[key].slots.map(s=>({pos:s.pos,x:s.x,y:s.y,p:null}));}
@@ -633,7 +633,7 @@ function startMatch(opp,ctx){
   const myAvg=mine.reduce((a,p)=>a+p.rating,0)/Math.max(1,mine.length);
   const myOvr=Math.round(myAvg),myAtkR=Math.round(wAvg(mine,AW)+standoutBonus(mine,AW,myAvg)),myDefR=Math.round(wAvg(mine,DW)+standoutBonus(mine,DW,myAvg));
   const oOvr=opp.ovr||Math.round(oAvg);
-  L={opp,ctx,mine,ox,oAtk,oDef,min:0,gf:0,ga:0,phil:"bal",foc:"bal",ev:[],offMine:new Set(),offOpp:new Set(),
+  L={opp,ctx,mine,ox,oAtk,oDef,min:0,gf:0,ga:0,phil:R.phil||"bal",foc:R.foc||"bal",ev:[],offMine:new Set(),offOpp:new Set(),
      aiNote:false,timer:null,saves:0,done:false};
   mount(`<section class="screen match rg-match">
     <div class="mclockbar"><div class="mround">${ctx.label}</div><div class="mclock"><span data-clock>0</span>'</div>
@@ -1049,8 +1049,8 @@ function act(r,v,btn){
     case "endless":R.cupIdx=CUPS.length-1;R.cupCounter=CUPS[CUPS.length-1].after;R.cup=null;R.offers=null;mountHub();break;
     case "play":{const opp=R.offers[+v];startMatch({name:opp.name,kit:opp.kit,ovr:opp.ovr,tier:opp.tier,league:opp.league,xi:opp.xi},{label:"League match",ko:false,cup:null});break;}
     case "cup-play":{const c=R.cup;startMatch(c.opp,{label:`${c.def.nm} · ${["Quarter-final","Semi-final","FINAL"][c.stage]}`,ko:true,cup:c});break;}
-    case "phil":if(L&&!L.done){L.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);}break;
-    case "foc":if(L&&!L.done){L.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);}break;
+    case "phil":if(L&&!L.done){L.phil=v;R.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);}break;
+    case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);}break;
     case "skip":skip();break;
     case "cont":finishMatch();break;
     case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player to unlock his potential"};toast(m[id]);refreshHub();}break;}
