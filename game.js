@@ -625,7 +625,7 @@ function xiOfMine(){
 function formOf(p){
   const rec=p&&p.recent||[]; if(rec.length<2)return {adj:0,mul:1};
   const d=rec.reduce((a,b)=>a+b,0)/rec.length-6.8;
-  return {adj:clamp(d*0.55,-1.6,2.2), mul:clamp(1+d*0.14,0.6,1.7)};
+  return {adj:clamp(d*0.4,-1.2,1.6), mul:clamp(1+d*0.1,0.7,1.4)};
 }
 function pickScorerIdx(xi,excl){
   const cand=xi.map((_,i)=>i).filter(i=>xi[i].pos!=="GK"&&!(excl&&excl.has(i)));
@@ -653,8 +653,8 @@ function buildMatch(round){
   let faw=0,fa=0,fdw=0,fd=0; myXI.forEach(x=>{const a=ATK_WEIGHT[x.pos]||0,d=DEF_WEIGHT[x.pos]||0;fa+=(x.fAdj||0)*a;faw+=a;fd+=(x.fAdj||0)*d;fdw+=d;});
   const myAtk=R.atk+chem+sbA+fa/Math.max(.1,faw), myDef=R.def+tac+sbD+fd/Math.max(.1,fdw); // +hidden form
   // higher base = more goals (3:2, 4:3); steeper slope = the better XI wins more reliably
-  const lamYou=clamp(1.6+(myAtk-oppDef)*0.20,0.15,5.5);
-  const lamOpp=clamp(1.6+(oppAtk-myDef)*0.20-fit,0.12,5.0);
+  const lamYou=clamp(1.6+(myAtk-oppDef)*0.16,0.15,5.5);
+  const lamOpp=clamp(1.6+(oppAtk-myDef)*0.16-fit,0.12,5.0);
   const gf=Math.min(7,poisson(lamYou)), ga=Math.min(7,poisson(lamOpp));
   const xiOf=s=>s==="you"?myXI:oppXI;
   // cards FIRST, so a sent-off player can't score afterwards

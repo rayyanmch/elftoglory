@@ -193,7 +193,7 @@ const DEF_WEIGHT = { GK:1.0, CB:.95, RB:.7, LB:.7, RWB:.55, LWB:.55, CDM:.72, CM
    both XIs — so an 85 in a 74 team scores/creates more (attack) or concedes less (defence). */
 function standoutBonus(arr, W, avg, k){
   let best=0; arr.forEach(p=>{const e=(p.rating-avg)*(W[p.pos]||0); if(e>best)best=e;});
-  return Math.min(5, best*(k==null?0.3:k));
+  return Math.min(3.5, best*(k==null?0.2:k));
 }
 
 /* --- Known young talents: extra potential. --- */

@@ -625,7 +625,7 @@ function matchPitchHTML(arr,who,kit){
 function formOf(p){
   const rec=p&&p.recent||[]; if(rec.length<2)return {adj:0,mul:1};
   const d=rec.reduce((a,b)=>a+b,0)/rec.length-6.8;
-  return {adj:clamp(d*0.55,-1.6,2.2), mul:clamp(1+d*0.14,0.6,1.7)};
+  return {adj:clamp(d*0.4,-1.2,1.6), mul:clamp(1+d*0.1,0.7,1.4)};
 }
 function startMatch(opp,ctx){
   R.phase="match";
@@ -683,8 +683,8 @@ function myEff(){
 }
 function pPerMin(){
   const e=myEff();
-  let lamY=clamp(1.6+(e.atk-L.oDef)*0.20,0.15,5.5)/90;
-  let lamO=clamp(1.6+(L.oAtk-e.def)*0.20,0.12,5.0)/90;
+  let lamY=clamp(1.6+(e.atk-L.oDef)*0.16,0.15,5.5)/90;
+  let lamO=clamp(1.6+(L.oAtk-e.def)*0.16,0.12,5.0)/90;
   const ph=PHIL[L.phil]; lamY*=ph.own; lamO*=ph.opp;
   if(R.passives.setp)lamY*=1.06;
   if(R.passives.iron)lamO*=0.94;
@@ -1101,8 +1101,8 @@ window.__RG={
           if(gf>ga)ph=PHIL.def;
           else if(gf<ga)ph=(m>=70?PHIL.allin:PHIL.att);
         }
-        let lamY=clamp(1.6+(myAtk-oDef)*0.20,0.15,5.5)/90*ph.own;
-        let lamO=clamp(1.6+(oAtk-myDef)*0.20,0.12,5.0)/90*ph.opp;
+        let lamY=clamp(1.6+(myAtk-oDef)*0.16,0.15,5.5)/90*ph.own;
+        let lamO=clamp(1.6+(oAtk-myDef)*0.16,0.12,5.0)/90*ph.opp;
         if(Math.random()<lamY)gf++;
         if(Math.random()<lamO)ga++;
       }
