@@ -507,6 +507,8 @@ function mountHub(){
 }
 function refreshHub(){if(R.phase==="hub")mountHub();}
 function flashSlot(i){const n=q(`.slot[data-rslot="${i}"] .kit`);if(n)n.classList.add("boostflash");}
+function markSwap(i){qa(".slot.swap-from").forEach(n=>n.classList.remove("swap-from"));if(i!=null){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("swap-from");}}
+function repaintSlot(i){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.innerHTML=jerseyHTML(xi()[i],i);}
 function onSlot(i){
   if(R.phase!=="hub")return;
   if(R.rp)return; // choosing a transfer/reward card — ignore XI swaps
@@ -515,13 +517,17 @@ function onSlot(i){
     if(!s.p)return;
     applyTarget(R.boostTarget,s.p); R.boostTarget=null; refreshHub(); flashSlot(i); return;
   }
-  if(R.swapFrom==null){ if(s.p){R.swapFrom=i; refreshHub();} return; }
-  if(R.swapFrom===i){ R.swapFrom=null; refreshHub(); return; }
-  const a=xi()[R.swapFrom],b=s;
+  // SWAP — done surgically (highlight / repaint only the affected jerseys + ratings), never a full hub re-render (that "reload" flash)
+  if(R.swapFrom==null){ if(s.p){R.swapFrom=i; markSwap(i);} return; }     // pick the first player
+  if(R.swapFrom===i){ R.swapFrom=null; markSwap(null); return; }          // tap him again → deselect
+  const from=R.swapFrom, a=xi()[from], b=s;
   const can=(p,pos)=>(ACC[pos]||[]).some(c=>p.pos.includes(c));
-  if(b.p&&can(a.p,b.pos)&&can(b.p,a.pos)){const t=a.p;a.p=b.p;b.p=t;}
-  else if(!b.p&&can(a.p,b.pos)){b.p=a.p;a.p=null;}
-  R.swapFrom=null; refreshHub();
+  let did=false;
+  if(b.p&&can(a.p,b.pos)&&can(b.p,a.pos)){const t=a.p;a.p=b.p;b.p=t;did=true;}   // swap two players (each must be able to play the other's slot)
+  else if(!b.p&&can(a.p,b.pos)){b.p=a.p;a.p=null;did=true;}                       // move into an empty slot
+  R.swapFrom=null; markSwap(null);
+  if(did){repaintSlot(from);repaintSlot(i);const rt=q(".ratings");if(rt)rt.outerHTML=ratingsHTML();}
+  else toast("Those positions don't fit");
 }
 
 /* ================= CUPS ================= */
