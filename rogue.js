@@ -55,8 +55,8 @@ const CRESTS=[
 
 /* ---------- philosophy & focus (hidden numbers!) ---------- */
 const PHIL={
-  bus:{lab:"Park the Bus",ico:"🚌",own:0.5,opp:0.4},
-  def:{lab:"Defensive",ico:"🛡️",own:0.72,opp:0.55},
+  bus:{lab:"Park the Bus",ico:"🚌",own:0.5,opp:0.5},
+  def:{lab:"Defensive",ico:"🛡️",own:0.72,opp:0.65},
   bal:{lab:"Balanced",ico:"⚖️",own:1,opp:1},
   att:{lab:"Attacking",ico:"⚔️",own:1.28,opp:1.12},
   allin:{lab:"All-In",ico:"🎰",own:1.62,opp:1.62}};
@@ -683,8 +683,8 @@ function myEff(){
 }
 function pPerMin(){
   const e=myEff();
-  let lamY=clamp(1.6+(e.atk-L.oDef)*0.13,0.15,5.5)/90;
-  let lamO=clamp(1.6+(L.oAtk-e.def)*0.13,0.12,5.0)/90;
+  let lamY=clamp(1.6+(e.atk-L.oDef)*0.20,0.15,5.5)/90;
+  let lamO=clamp(1.6+(L.oAtk-e.def)*0.20,0.12,5.0)/90;
   const ph=PHIL[L.phil]; lamY*=ph.own; lamO*=ph.opp;
   if(R.passives.setp)lamY*=1.06;
   if(R.passives.iron)lamO*=0.94;
@@ -1095,8 +1095,8 @@ window.__RG={
           if(gf>ga)ph=PHIL.def;
           else if(gf<ga)ph=(m>=70?PHIL.allin:PHIL.att);
         }
-        let lamY=clamp(1.6+(myAtk-oDef)*0.13,0.15,5.5)/90*ph.own;
-        let lamO=clamp(1.6+(oAtk-myDef)*0.13,0.12,5.0)/90*ph.opp;
+        let lamY=clamp(1.6+(myAtk-oDef)*0.20,0.15,5.5)/90*ph.own;
+        let lamO=clamp(1.6+(oAtk-myDef)*0.20,0.12,5.0)/90*ph.opp;
         if(Math.random()<lamY)gf++;
         if(Math.random()<lamO)ga++;
       }

@@ -653,8 +653,8 @@ function buildMatch(round){
   let faw=0,fa=0,fdw=0,fd=0; myXI.forEach(x=>{const a=ATK_WEIGHT[x.pos]||0,d=DEF_WEIGHT[x.pos]||0;fa+=(x.fAdj||0)*a;faw+=a;fd+=(x.fAdj||0)*d;fdw+=d;});
   const myAtk=R.atk+chem+sbA+fa/Math.max(.1,faw), myDef=R.def+tac+sbD+fd/Math.max(.1,fdw); // +hidden form
   // higher base = more goals (3:2, 4:3); steeper slope = the better XI wins more reliably
-  const lamYou=clamp(1.6+(myAtk-oppDef)*0.13,0.15,5.5);
-  const lamOpp=clamp(1.6+(oppAtk-myDef)*0.13-fit,0.12,5.0);
+  const lamYou=clamp(1.6+(myAtk-oppDef)*0.20,0.15,5.5);
+  const lamOpp=clamp(1.6+(oppAtk-myDef)*0.20-fit,0.12,5.0);
   const gf=Math.min(7,poisson(lamYou)), ga=Math.min(7,poisson(lamOpp));
   const xiOf=s=>s==="you"?myXI:oppXI;
   // cards FIRST, so a sent-off player can't score afterwards
