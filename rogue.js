@@ -745,18 +745,24 @@ function fullTime(){
 function shootout(){
   feed(90,"🥅","<b>Penalties decide it!</b>");
   const e=myEff();const pMe=clamp(0.74+(e.atk+e.def-L.oAtk-L.oDef)*0.004,0.5,0.92),pOp=clamp(0.72,0.5,0.9);
-  const ky=[],ko=[];let sy=0,so=0;
+  const ky=[],ko=[];
   for(let i=0;i<5;i++){ky.push(Math.random()<pMe?1:0);ko.push(Math.random()<pOp?1:0);}
-  sy=ky.reduce((a,b)=>a+b,0);so=ko.reduce((a,b)=>a+b,0);
-  while(sy===so&&ky.length<11){const a=Math.random()<pMe?1:0,b=Math.random()<pOp?1:0;ky.push(a);ko.push(b);sy+=a;so+=b;}
-  if(sy===so){if(Math.random()<pMe)sy++;else so++;}
+  let sy=ky.reduce((a,b)=>a+b,0),so=ko.reduce((a,b)=>a+b,0),guard=0;
+  while(sy===so&&guard++<20){const a=Math.random()<pMe?1:0,b=Math.random()<pOp?1:0;ky.push(a);ko.push(b);sy+=a;so+=b;} // sudden death (dots decide the result)
+  if(sy===so){if(Math.random()<pMe){ky.push(1);ko.push(0);sy++;}else{ky.push(0);ko.push(1);so++;}}
   L.pens={you:sy,opp:so,win:sy>so};
-  const w=q("[data-shoot]");
-  if(w){w.innerHTML=`<div class="shootout"><div class="so-ttl">Penalty Shootout</div>
-    <div class="so-row"><span class="so-lab">YOU</span><span class="so-dots">${ky.map(k=>`<span class="so ${k?"ok":"miss"}">${k?"●":"○"}</span>`).join("")}</span><b class="so-n">${sy}</b></div>
-    <div class="so-row"><span class="so-lab">${L.opp.name.slice(0,14)}</span><span class="so-dots">${ko.map(k=>`<span class="so ${k?"ok":"miss"}">${k?"●":"○"}</span>`).join("")}</span><b class="so-n">${so}</b></div></div>`;}
-  feed(90,"🏁",`Shootout ${sy}–${so} — you ${L.pens.win?"WIN":"lose"}.`,L.pens.win?"goal":"red");
-  showCont();
+  const done=()=>{feed(90,"🏁",`Shootout ${sy}–${so} — you ${L.pens.win?"WIN":"lose"}.`,L.pens.win?"goal":"red");showCont();};
+  const w=q("[data-shoot]"); if(!w)return done();
+  w.innerHTML=`<div class="shootout"><div class="so-ttl">Penalty Shootout</div>
+    <div class="so-row"><span class="so-lab">YOU</span><span class="so-dots" data-so-you></span><b class="so-n" data-so-yn>0</b></div>
+    <div class="so-row"><span class="so-lab">${L.opp.name.slice(0,14)}</span><span class="so-dots" data-so-opp></span><b class="so-n" data-so-on>0</b></div></div>`;
+  let i=0,yn=0,on=0,iv;const maxK=Math.max(ky.length,ko.length); // reveal one kick per side at a time (like WM mode)
+  iv=setInterval(()=>{
+    if(i<ky.length){yn+=ky[i];const d=q("[data-so-you]");if(d)d.innerHTML+=`<span class="so ${ky[i]?"ok":"miss"}">${ky[i]?"●":"○"}</span>`;const n=q("[data-so-yn]");if(n)n.textContent=yn;}
+    if(i<ko.length){on+=ko[i];const d=q("[data-so-opp]");if(d)d.innerHTML+=`<span class="so ${ko[i]?"ok":"miss"}">${ko[i]?"●":"○"}</span>`;const n=q("[data-so-on]");if(n)n.textContent=on;}
+    i++;
+    if(i>=maxK){clearInterval(iv);done();}
+  },440);
 }
 function showCont(){const s=q('[data-r="skip"]');if(s)s.style.display="none";const c=q('[data-r="cont"]');if(c)c.style.display="";}
 function skip(){
