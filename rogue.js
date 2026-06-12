@@ -190,8 +190,9 @@ function potOf(rating,age,name){
   if(rating>=93)pot=Math.max(pot,99); else if(rating>=90)pot=Math.max(pot,rating+4); else if(rating>=87)pot=Math.max(pot,rating+3);
   return Math.min(99,Math.max(rating+2,pot));
 }
-const FREE_AGENTS=[ // not attached to any club, but in the transfer/youngster pool
+const FREE_AGENTS=[ // in the transfer/youngster pool but NOT in any club's matchday XI (club is display-only)
   {name:"Pato Rivas",rating:79,pos:["CB","CDM"],age:19,potential:87},
+  {name:"Lennart Karl",rating:78,pos:["RW","CAM"],age:17,potential:90,club:"FC Bayern München",clubShort:"FCB",league:"BUN",tier:1,kit:{p:"#dc052d",s:"#ffffff",t:"#ffffff"}},
 ];
 function buildPool(){
   if(ALL)return true;
@@ -206,8 +207,8 @@ function buildPool(){
     clubs.push(club); players.push(...ps);
   }));
   FREE_AGENTS.forEach(f=>players.push({name:f.name,rating:f.rating,base:f.rating,pos:f.pos.slice(),age:f.age,
-    potential:f.potential||potOf(f.rating,f.age,f.name),club:"No club",clubShort:"FA",league:"FA",tier:4,
-    kit:{p:"#262b36",s:"#d7deec",t:"#d7deec"},mr:{sum:0,n:0},recent:[],tG:0,tA:0}));
+    potential:f.potential||potOf(f.rating,f.age,f.name),club:f.club||"No club",clubShort:f.clubShort||"FA",league:f.league||"FA",tier:f.tier||4,
+    kit:f.kit||{p:"#262b36",s:"#d7deec",t:"#d7deec"},mr:{sum:0,n:0},recent:[],tG:0,tA:0}));
   ALL={clubs,players};
   return true;
 }
