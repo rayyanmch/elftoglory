@@ -649,7 +649,7 @@ function startMatch(opp,ctx){
       <div class="mmid"><div class="mshoot" data-shoot></div><div class="mfeed" data-feed></div></div>
       <div class="mside opp"><div class="ms-head"><div class="ms-flag">${opp.special?"✦":"🏟️"}</div><div class="ms-nm-wrap"><div class="ms-name">${opp.name}</div><div class="ms-stats">OVR <b>${oOvr}</b> · <span class="st-a">ATK ${Math.round(oAtk)}</span> · <span class="st-d">DEF ${Math.round(oDef)}</span></div></div><div class="ms-score" data-ga>0</div></div>
         <div class="ms-scorers" data-sc-opp></div>
-        ${matchPitchHTML(autoXY(ox),"opp",opp.kit)}</div>
+        ${matchPitchHTML(autoXYopp(ox),"opp",opp.kit)}</div>
     </div>
     <div class="mbar"><button class="btn ghost" data-r="skip">Skip ⏩</button>
       <div class="mlive"><span class="livedot"></span> LIVE — coach from the bench!</div>

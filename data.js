@@ -121,6 +121,31 @@ const FORMATIONS = {
 /* Lay an arbitrary XI (array of {pos,...}) onto a pitch: band vertically by role,
    spread horizontally left→right within each band. Returns copies with x,y added.
    Shared by both modes for rendering opponent line-ups on a pitch. */
+// Opponent XIs are picked by rating (clubXI) so they can be lopsided (e.g. 5 high-rated CBs → a nonsense "5-1-1-1-1-1").
+// Lay ANY 11 into a clean 4-3-3 by best-fit per slot, so opponents always render as a believable shape.
+function autoXYopp(arr){
+  // each slot lists position tiers in PREFERENCE order (real fullback before a CB filling in, etc.)
+  const T=[
+    {x:50,y:90,t:[["GK"]]},
+    {x:50,y:18,t:[["ST","CF","SS"],["CAM"],["LW","RW"]]},
+    {x:18,y:27,t:[["LW","LM"],["CAM"],["ST","RW","RM"]]},
+    {x:82,y:27,t:[["RW","RM"],["CAM"],["ST","LW","LM"]]},
+    {x:13,y:72,t:[["LB","LWB"],["LM"],["CB"]]},
+    {x:87,y:72,t:[["RB","RWB"],["RM"],["CB"]]},
+    {x:37,y:76,t:[["CB"],["CDM"]]},
+    {x:63,y:76,t:[["CB"],["CDM"]]},
+    {x:50,y:57,t:[["CDM"],["CM"],["CB"]]},
+    {x:31,y:47,t:[["CM","LM"],["CDM","CAM"]]},
+    {x:69,y:47,t:[["CM","RM"],["CDM","CAM"]]}
+  ];
+  const out=arr.map(p=>Object.assign({},p)), used=new Set();
+  const posOf=p=>Array.isArray(p.pos)?p.pos[0]:p.pos;
+  const pickTier=tier=>{let bi=-1,br=-2;out.forEach((p,i)=>{if(used.has(i))return;if(tier.includes(posOf(p))&&p.rating>br){br=p.rating;bi=i;}});return bi;};
+  const grab=tiers=>{for(let k=0;k<tiers.length;k++){const i=pickTier(tiers[k]);if(i>=0)return i;}let bi=-1,br=-2;out.forEach((p,i)=>{if(used.has(i))return;if(p.rating>br){br=p.rating;bi=i;}});return bi;};
+  T.forEach(slot=>{const i=grab(slot.t); if(i>=0){used.add(i);out[i].x=slot.x;out[i].y=slot.y;}});
+  out.forEach((p,i)=>{if(!used.has(i)){if(p.x==null)p.x=50;if(p.y==null)p.y=50;}});
+  return out;
+}
 function autoXY(arr){
   const band=p=>p.pos==="GK"?90:["CB","RB","LB","RWB","LWB"].includes(p.pos)?74:p.pos==="CDM"?62:["CM","LM","RM"].includes(p.pos)?50:p.pos==="CAM"?40:["LW","RW"].includes(p.pos)?30:18;
   const zone=p=>["LB","LWB","LM","LW"].includes(p.pos)?-1:["RB","RWB","RM","RW"].includes(p.pos)?1:0; // -1 left · 0 centre · 1 right

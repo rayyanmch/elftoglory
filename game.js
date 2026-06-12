@@ -711,7 +711,7 @@ function sideColumn(side,m){
     ? `<div class="ms-head"><div class="ms-flag">🎽</div><div class="ms-name">YOUR ELF</div><div class="ms-score" data-gf>0</div></div>`
     : `<div class="ms-head"><div class="ms-flag">${m.opp.flag}</div><div class="ms-name">${m.opp.name}</div><div class="ms-score" data-ga>0</div></div>`;
   const oppKit=m.opp.kit;
-  const jers=autoXY(xi).map((p,i)=>`<div class="mxj tier-${ratingTier(p.rating)}" data-i="${i}" style="left:${p.x}%;top:${p.y}%">
+  const jers=(side==="you"?autoXY(xi):autoXYopp(xi)).map((p,i)=>`<div class="mxj tier-${ratingTier(p.rating)}" data-i="${i}" style="left:${p.x}%;top:${p.y}%">
       <div class="mxj-kit">${kitSVG(side==="you"?p.kit:oppKit,p.rating)}</div><span class="mxj-nm">${p.sur}</span><span class="mx-ico"></span></div>`).join("");
   return `<div class="mside ${side}">${head}<div class="ms-scorers" data-scorers></div><div class="ms-pitch ${side}"><div class="pitch-lines"><span class="cc"></span><span class="hl"></span><span class="box t"></span><span class="box b"></span></div>${jers}</div></div>`;
 }
