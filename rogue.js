@@ -678,6 +678,7 @@ function startMatch(opp,ctx){
       <div class="ctl-grp"><span class="ctl-lab">Philosophy</span><div class="ctl-row">${Object.keys(PHIL).map(k=>`<button class="ctl tac ${k===L.phil?"on":""} ph-${k}" data-r="phil" data-v="${k}">${tacSVG(k)}<span class="ctl-cap">${PHIL[k].ico} ${PHIL[k].lab}</span></button>`).join("")}</div></div>
       <div class="ctl-grp"><span class="ctl-lab">Focus</span><div class="ctl-row">${Object.keys(FOCUS).map(k=>`<button class="ctl tac ${k===L.foc?"on":""}" data-r="foc" data-v="${k}">${tacSVG(k==="bal"?"fbal":k)}<span class="ctl-cap">${FOCUS[k].ico} ${FOCUS[k].lab}</span></button>`).join("")}</div></div>
     </div>
+    <div class="wdl" data-wdl></div>
     <div class="mgrid">
       <div class="mside you"><div class="ms-head"><div class="ms-flag">${CRESTS[R.club.crest].e}</div><div class="ms-nm-wrap"><div class="ms-name">${R.club.name}</div><div class="ms-stats">OVR <b>${myOvr}</b> · <span class="st-a">ATK ${myAtkR}</span> · <span class="st-d">DEF ${myDefR}</span></div></div><div class="ms-score" data-gf>0</div></div>
         <div class="ms-scorers" data-sc-you></div>
@@ -692,6 +693,7 @@ function startMatch(opp,ctx){
       <button class="btn btn-primary" data-r="cont" style="display:none">Continue ▶</button></div>
   </section>`);
   feed(1,"🟢",`Kick-off! ${R.club.name} vs ${opp.name}.`);
+  renderWDL();
   L.timer=setInterval(tick,244);
 }
 function myEff(){
@@ -726,6 +728,31 @@ function pPerMin(){
   const _ld=L.gf-L.ga; if(_ld>=3)lamY*=0.6; else if(_ld<=-3)lamO*=0.6;
   return {lamY,lamO};
 }
+// Win/Draw/Loss odds — Monte-Carlo over the SAME per-minute model (phil/focus/passives + late-AI + damper), simulated from the current minute & score to full time. At kick-off it's a pre-match line; in play it's a live win probability.
+function wdlOdds(){
+  if(!L)return null;
+  const e=myEff(),ph=PHIL[L.phil];
+  const sp=R.passives.setp?1.06:1, ir=R.passives.iron?0.94:1, gk=R.passives.gkaura?0.92:1;
+  const bY=clamp(1.6+(e.atk-L.oDef)*0.16,0.15,5.5)/90*ph.own*sp;
+  const bO=clamp(1.6+(L.oAtk-e.def)*0.16,0.12,5.0)/90*ph.opp*ir*gk;
+  const start=Math.max(1,L.min),N=1400; let w=0,d=0;
+  for(let k=0;k<N;k++){ let gf=L.gf,go=L.ga;
+    for(let m=start;m<=90;m++){ let lamY=bY,lamO=bO;
+      if(m>=70&&go<gf){lamO*=1.25;lamY*=0.9;} if(m>=80&&go>gf){lamO*=0.7;lamY*=0.85;}
+      const ld=gf-go; if(ld>=3)lamY*=0.6; else if(ld<=-3)lamO*=0.6;
+      if(Math.random()<lamY)gf++; if(Math.random()<lamO)go++; }
+    if(gf>go)w++; else if(gf===go)d++; }
+  return {w:w/N,d:d/N,l:(N-w-d)/N};
+}
+function renderWDL(){
+  const box=q("[data-wdl]"); if(!box||!L||L.done)return;
+  const o=wdlOdds(); if(!o)return;
+  const pc=x=>Math.round(x*100);
+  const live=L.min>0&&L.min<90;
+  box.innerHTML=`<div class="wdl-lab">${live?`Win chance · ${L.min}'`:"Pre-match odds"}</div>
+    <div class="wdl-bar"><span class="wdl-w" style="width:${(o.w*100).toFixed(1)}%"></span><span class="wdl-d" style="width:${(o.d*100).toFixed(1)}%"></span><span class="wdl-l" style="width:${(o.l*100).toFixed(1)}%"></span></div>
+    <div class="wdl-legend"><span class="wl-w">● Win ${pc(o.w)}%</span><span class="wl-d">● Draw ${pc(o.d)}%</span><span class="wl-l">● Loss ${pc(o.l)}%</span></div>`;
+}
 function scorerIdx(arr,off,wf){const c=arr.map((_,i)=>i).filter(i=>arr[i].pos!=="GK"&&!off.has(i));return c.length?wpick(c,i=>wf(arr[i])):-1;}
 function focusW(p,base){
   let w=Math.pow(base[p.pos]||0.05,1.5)*Math.pow(p.rating+(p.fAdj||0),2.0);
@@ -755,9 +782,10 @@ function goal(side){
 function tick(){
   L.min++;
   const ck=q("[data-clock]");if(ck)ck.textContent=L.min;
-  const {lamY,lamO}=pPerMin();
+  const {lamY,lamO}=pPerMin(); const _g0=L.gf+L.ga;
   if(Math.random()<lamY)goal("you");
   if(Math.random()<lamO)goal("opp");
+  if(L.gf+L.ga!==_g0||L.min%10===0)renderWDL(); // refresh odds on every goal + every 10' for the time-drift
   if(Math.random()<0.017){const side=Math.random()<0.5?"you":"opp";const arr=side==="you"?L.mine:L.ox;feed(L.min,"🟨",`Yellow — ${pick(arr).name}.`);}
   if(Math.random()<0.0011){const side=Math.random()<0.5?"you":"opp";const arr=side==="you"?L.mine:L.ox,off=side==="you"?L.offMine:L.offOpp;
     const c=arr.map((_,i)=>i).filter(i=>arr[i].pos!=="GK"&&!off.has(i));
@@ -1107,8 +1135,8 @@ function act(r,v,btn){
     case "endless":R.cupIdx=CUPS.length-1;R.cupCounter=CUPS[CUPS.length-1].after;R.cup=null;R.offers=null;mountHub();break;
     case "play":{const opp=R.offers[+v];startMatch({name:opp.name,kit:opp.kit,ovr:opp.ovr,tier:opp.tier,league:opp.league,xi:opp.xi},{label:"League match",ko:false,cup:null});break;}
     case "cup-play":{const c=R.cup;startMatch(c.opp,{label:`${c.def.nm} · ${["Quarter-final","Semi-final","FINAL"][c.stage]}`,ko:true,cup:c});break;}
-    case "phil":if(L&&!L.done){L.phil=v;R.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);}break;
-    case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);}break;
+    case "phil":if(L&&!L.done){L.phil=v;R.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);renderWDL();}break;
+    case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);renderWDL();}break;
     case "skip":skip();break;
     case "cont":finishMatch();break;
     case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player for +5 rating (up to potential)"};toast(m[id]);refreshHub();}break;}
