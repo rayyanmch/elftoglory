@@ -55,11 +55,11 @@ const CRESTS=[
 
 /* ---------- philosophy & focus (hidden numbers!) ---------- */
 const PHIL={
-  bus:{lab:"Park the Bus",ico:"🚌",own:0.5,opp:0.5},
-  def:{lab:"Defensive",ico:"🛡️",own:0.72,opp:0.65},
+  bus:{lab:"Park the Bus",ico:"🚌",own:0.45,opp:0.55},   // both score way less, you even less → only to protect a lead
+  def:{lab:"Defensive",ico:"🛡️",own:0.62,opp:0.72},      // fewer goals, you sacrifice more offence → pays off when leading / as the underdog
   bal:{lab:"Balanced",ico:"⚖️",own:1,opp:1},
-  att:{lab:"Attacking",ico:"⚔️",own:1.28,opp:1.12},
-  allin:{lab:"All-In",ico:"🎰",own:1.62,opp:1.62}};
+  att:{lab:"Attacking",ico:"⚔️",own:1.28,opp:1.20},      // you score more, but the opp benefits a tick more too → only worth it if you're superior
+  allin:{lab:"All-In",ico:"🎰",own:1.62,opp:1.72}};      // wide open both ways, opp gains the most → a gamble for the clearly-better (or desperate) side
 const FOCUS={wings:{lab:"Wings",ico:"⇆"},bal:{lab:"Balanced",ico:"▣"},centre:{lab:"Centre",ico:"◎"}};
 /* mini-pitch dot layouts (viewBox 60×80, your goal at the BOTTOM) — signal each tactic visually */
 const TAC_VIS={
@@ -266,7 +266,8 @@ function wire(){
   app.addEventListener("mousemove",e=>{ tipMX=e.clientX; tipMY=e.clientY;
     const sl=e.target.closest('.slot[data-rslot]'); const idx=(sl&&R&&R.phase==="hub")?+sl.dataset.rslot:-1;
     if(idx!==tipSlot){ tipSlot=idx; clearTimeout(tipT); hidePlayerTip();
-      if(idx>=0){const sp=xi()[idx]&&xi()[idx].p; if(sp)tipT=setTimeout(()=>showPlayerTip(sp),520);} }
+      // no tooltip while you're mid-swap / signing / applying an item — it must never sit between you and the second click
+      if(idx>=0&&R.swapFrom==null&&!R.signing&&R.boostTarget==null&&!R.rp){const sp=xi()[idx]&&xi()[idx].p; if(sp)tipT=setTimeout(()=>showPlayerTip(sp),520);} }
   });
   app.addEventListener("mouseleave",()=>{clearTimeout(tipT);hidePlayerTip();tipSlot=-2;});
 }
@@ -718,9 +719,11 @@ function pPerMin(){
   if(R.passives.setp)lamY*=1.06;
   if(R.passives.iron)lamO*=0.94;
   if(R.passives.gkaura)lamO*=0.92;
-  // simple opponent AI late-game
-  if(L.min>=70&&L.ga<L.gf){lamO*=1.25;lamY*=1.1;if(!L.aiNote){L.aiNote=true;feed(L.min,"📣",`${L.opp.name} throw everything forward!`,"opp");}}
+  // simple opponent AI late-game — when YOU lead late you game-manage (ease off) while they push forward
+  if(L.min>=70&&L.ga<L.gf){lamO*=1.25;lamY*=0.9;if(!L.aiNote){L.aiNote=true;feed(L.min,"📣",`${L.opp.name} throw everything forward!`,"opp");}}
   if(L.min>=80&&L.ga>L.gf){lamO*=0.7;lamY*=0.85;if(!L.aiNote){L.aiNote=true;feed(L.min,"🧊",`${L.opp.name} park the bus.`,"opp");}}
+  // garbage-time damper: a side 3+ goals ahead stops piling on → kills 9:1 blowouts (close games untouched, comebacks stay open)
+  const _ld=L.gf-L.ga; if(_ld>=3)lamY*=0.6; else if(_ld<=-3)lamO*=0.6;
   return {lamY,lamO};
 }
 function scorerIdx(arr,off,wf){const c=arr.map((_,i)=>i).filter(i=>arr[i].pos!=="GK"&&!off.has(i));return c.length?wpick(c,i=>wf(arr[i])):-1;}
@@ -728,7 +731,7 @@ function focusW(p,base){
   let w=Math.pow(base[p.pos]||0.05,1.5)*Math.pow(p.rating+(p.fAdj||0),2.0);
   const wide=["LW","RW","LM","RM","LB","RB","LWB","RWB"].includes(p.pos);
   if(L.foc==="wings"&&wide)w*=1.8;
-  if(L.foc==="centre"&&!wide&&p.pos!=="GK")w*=1.6;
+  if(L.foc==="centre"&&!wide&&p.pos!=="GK")w*=1.8;
   return w*(p.fMul||1); // hidden form: in-form players get the ball / chances more
 }
 function markIco(side,idx,kind){
