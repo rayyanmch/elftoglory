@@ -269,9 +269,10 @@ b{font-weight:700}
 
 /* LIVE MATCH — your XI left · feed centre · opponent XI right */
 .screen.match{padding:1rem;gap:.8rem;max-width:1120px;margin:0 auto;width:100%}
-.mclockbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;background:linear-gradient(135deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:.65rem 1.1rem;margin-top:.4rem}
-.mclockbar .mround{font-size:.72rem;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:800}
-.mclock{font-size:1.5rem;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums}
+.mclockbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.8rem;width:100%;background:linear-gradient(135deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:.5rem 1.1rem;margin-top:.4rem}
+.mclockbar .mround{font-size:.72rem;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:800;justify-self:start}
+.mclockbar .wdl{justify-self:center;width:clamp(200px,33vw,330px);margin:0;padding:0}
+.mclock{justify-self:end;text-align:right;font-size:1.5rem;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums}
 .mcards{display:flex;align-items:center;gap:.5rem;font-size:.74rem;font-weight:800;color:var(--muted)}
 .cardsep{opacity:.45;font-size:.68rem}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);gap:.9rem;width:100%;align-items:start}
@@ -423,6 +424,7 @@ b{font-weight:700}
 @media (max-width:420px){
   .jersey{width:64px}.kit{width:50px;height:46px}
   .mclock{font-size:1.2rem}.ms-flag{font-size:1.5rem}.ms-score{font-size:1.5rem}
+  .mclockbar{gap:.45rem;padding:.5rem .6rem}.mclockbar .wdl{width:min(186px,47vw)}.mclockbar .mround{font-size:.58rem;letter-spacing:.3px}
   .ratings{grid-template-columns:repeat(3,1fr)}.rt.meta{grid-column:1/-1;flex-direction:row;justify-content:center;gap:.5rem;margin-top:.2rem;align-items:center}
   .es-stats{grid-template-columns:1fr 1fr}
 }

@@ -672,13 +672,13 @@ function startMatch(opp,ctx){
   L={opp,ctx,mine,ox,oAtk,oDef,min:0,gf:0,ga:0,phil:R.phil||"bal",foc:R.foc||"bal",ev:[],offMine:new Set(),offOpp:new Set(),
      aiNote:false,timer:null,saves:0,done:false};
   mount(`<section class="screen match rg-match">
-    <div class="mclockbar"><div class="mround">${ctx.label}</div><div class="mclock"><span data-clock>0</span>'</div>
-      <div class="mround" style="visibility:hidden">${ctx.label}</div></div>
+    <div class="mclockbar"><div class="mround">${ctx.label}</div>
+      <div class="wdl" data-wdl></div>
+      <div class="mclock"><span data-clock>0</span>'</div></div>
     <div class="rg-controls">
       <div class="ctl-grp"><span class="ctl-lab">Philosophy</span><div class="ctl-row">${Object.keys(PHIL).map(k=>`<button class="ctl tac ${k===L.phil?"on":""} ph-${k}" data-r="phil" data-v="${k}">${tacSVG(k)}<span class="ctl-cap">${PHIL[k].ico} ${PHIL[k].lab}</span></button>`).join("")}</div></div>
       <div class="ctl-grp"><span class="ctl-lab">Focus</span><div class="ctl-row">${Object.keys(FOCUS).map(k=>`<button class="ctl tac ${k===L.foc?"on":""}" data-r="foc" data-v="${k}">${tacSVG(k==="bal"?"fbal":k)}<span class="ctl-cap">${FOCUS[k].ico} ${FOCUS[k].lab}</span></button>`).join("")}</div></div>
     </div>
-    <div class="wdl" data-wdl></div>
     <div class="mgrid">
       <div class="mside you"><div class="ms-head"><div class="ms-flag">${CRESTS[R.club.crest].e}</div><div class="ms-nm-wrap"><div class="ms-name">${R.club.name}</div><div class="ms-stats">OVR <b>${myOvr}</b> · <span class="st-a">ATK ${myAtkR}</span> · <span class="st-d">DEF ${myDefR}</span></div></div><div class="ms-score" data-gf>0</div></div>
         <div class="ms-scorers" data-sc-you></div>
@@ -749,7 +749,7 @@ function renderWDL(){
   const o=wdlOdds(); if(!o)return;
   const pc=x=>Math.round(x*100);
   const live=L.min>0&&L.min<90;
-  box.innerHTML=`<div class="wdl-lab">${live?`Win chance · ${L.min}'`:"Pre-match odds"}</div>
+  box.innerHTML=`<div class="wdl-lab">${live?"Win chance":"Pre-match odds"}</div>
     <div class="wdl-bar"><span class="wdl-w" style="width:${(o.w*100).toFixed(1)}%"></span><span class="wdl-d" style="width:${(o.d*100).toFixed(1)}%"></span><span class="wdl-l" style="width:${(o.l*100).toFixed(1)}%"></span></div>
     <div class="wdl-legend"><span class="wl-w">● Win ${pc(o.w)}%</span><span class="wl-d">● Draw ${pc(o.d)}%</span><span class="wl-l">● Loss ${pc(o.l)}%</span></div>`;
 }
