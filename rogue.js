@@ -864,11 +864,12 @@ function finishMatch(){
         if(def.apply)def.apply(R);
         R.cupIdx=Math.min(R.cupIdx+1,CUPS.length);
         R.cupCounter=R.cupIdx<CUPS.length?CUPS[R.cupIdx].after:9999;
-        const eliteMin=def.id==="copper"?Math.max(82,myOVR()):def.id==="silver"?Math.max(80,myOVR()+3):def.id==="euro"?Math.max(85,myOVR()+3):0;
+        // cup-completion elite window, CAPPED per cup tier so a low cup can't spit out a galáctico (Yamal in Silver). Floor floats up to your OVR but never past the cap; a rare "lucky" band sits just above. Copper 82-85 · Silver 84-87 · Europa 88-91 (UCL = top-20 galácticos, the ultimate reward).
+        const ew=def.id==="copper"?{min:82,cap:85,lucky:[86,89]}:def.id==="silver"?{min:84,cap:87,lucky:[88,90]}:def.id==="euro"?{min:88,cap:91,lucky:[92,94]}:null;
         growthPopup(changes,()=>cupWonOverlay(def,()=>{
           const opts=def.id==="ucl"?{top20:true,count:R.passives.scout?6:5}
-            :def.id==="copper"?{eliteMin,eliteCap:85,lucky:[86,89],luckyProb:0.05,count:R.passives.scout?6:5} // Copper: a good ~84-85 player regularly, an elite (86-89) only on a rare lucky window
-            :{eliteMin,count:R.passives.scout?6:5};
+            :ew?{eliteMin:clamp(myOVR(),ew.min,ew.cap),eliteCap:ew.cap,lucky:ew.lucky,luckyProb:0.05,count:R.passives.scout?6:5}
+            :{count:R.passives.scout?6:5};
           transferWindow(beaten,opts,()=>{
             const finish=()=>{R.offers=null;if(def.id==="ucl")showFinalInvite();else mountHub();};
             if(R.pendingUnlock){R.pendingUnlock=false;R.items.push("unlock");toast("💎 Potential Unlock added to your Items");}
@@ -942,8 +943,8 @@ function transferCandidates(beaten,opts){
       let lo=opts.eliteMin, hi=cap;
       if(lk&&Math.random()<lp){lo=lk[0];hi=lk[1];}
       let band=free().filter(p=>p.rating>=lo&&p.rating<=hi);
-      if(!band.length)band=free().filter(p=>p.rating>=opts.eliteMin);
-      if(!band.length)band=free(); if(!band.length)break;
+      if(!band.length)band=free().filter(p=>p.rating>=Math.max(56,opts.eliteMin-5)&&p.rating<=cap); // sparse band → lower the floor, NEVER break the ceiling (cap)
+      if(!band.length)band=free().filter(p=>p.rating<=cap); if(!band.length)break;
       const posN={};band.forEach(p=>{const k=p.pos[0];posN[k]=(posN[k]||0)+1;});
       add(wpick(band,x=>(x.rating>=myo+2?2:1)/Math.sqrt(posN[x.pos[0]]||1)));
     }
