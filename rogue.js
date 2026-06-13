@@ -261,6 +261,26 @@ function wire(){
   const app=document.getElementById("app");
   app.addEventListener("mouseover",e=>{const c=e.target.closest('.tcard[data-r="tpick"]');if(c&&R&&R.rp&&R.rp.kind==="transfer")hoverFits(R.rp.cands[+c.dataset.v]);});
   app.addEventListener("mouseout",e=>{if(e.target.closest('.tcard[data-r="tpick"]'))clearFits();});
+  // hover a player in your XI for ~0.5s → floating stat tooltip near the cursor
+  let tipT=null,tipSlot=-2;
+  app.addEventListener("mousemove",e=>{ tipMX=e.clientX; tipMY=e.clientY;
+    const sl=e.target.closest('.slot[data-rslot]'); const idx=(sl&&R&&R.phase==="hub")?+sl.dataset.rslot:-1;
+    if(idx!==tipSlot){ tipSlot=idx; clearTimeout(tipT); hidePlayerTip();
+      if(idx>=0){const sp=xi()[idx]&&xi()[idx].p; if(sp)tipT=setTimeout(()=>showPlayerTip(sp),520);} }
+  });
+  app.addEventListener("mouseleave",()=>{clearTimeout(tipT);hidePlayerTip();tipSlot=-2;});
+}
+let _ptip=null,tipMX=0,tipMY=0;
+function hidePlayerTip(){if(_ptip){_ptip.remove();_ptip=null;}}
+function showPlayerTip(p){
+  hidePlayerTip(); if(!p)return;
+  const rec=p.recent||[],form=rec.length?(rec.reduce((a,b)=>a+b,0)/rec.length).toFixed(1):"–";
+  _ptip=el(`<div class="ptip"><div class="ptip-nm">${p.name}</div><div class="ptip-sub">${p.pos.join(" / ")} · age ${p.age}</div>
+    <div class="ptip-grid"><span>OVR <b>${p.rating}</b></span><span>POT <b>${p.potential}</b></span><span>Form <b>${form}</b></span><span>⚽ <b>${p.tG||0}</b></span><span>👟 <b>${p.tA||0}</b></span></div></div>`);
+  document.body.appendChild(_ptip);
+  const r=_ptip.getBoundingClientRect(); let px=tipMX+14,py=tipMY+14;
+  if(px+r.width>innerWidth-8)px=tipMX-r.width-14; if(py+r.height>innerHeight-8)py=tipMY-r.height-14;
+  _ptip.style.left=Math.max(8,px)+"px"; _ptip.style.top=Math.max(8,py)+"px";
 }
 function hoverFits(p){clearFits();if(!p)return;xi().forEach((s,i)=>{if((ACC[s.pos]||[]).some(c=>p.pos.includes(c))){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("cand-hover");}});}
 function clearFits(){qa(".cand-hover").forEach(n=>n.classList.remove("cand-hover"));}
@@ -374,13 +394,12 @@ function jerseyHTML(s,i){
   const cur=clamp((p.rating-50)/49,0,1)*100,pot=clamp((p.potential-50)/49,0,1)*100;
   const rec=p.recent||[],ravg=rec.length?rec.reduce((a,b)=>a+b,0)/rec.length:0;
   const mr=rec.length?`<span class="jmr ${ravg>=8?"hi":ravg>=7?"mid":ravg>=6?"ok":"low"}" title="Avg rating, last ${rec.length} match${rec.length>1?"es":""}">${ravg.toFixed(1)}</span>`:"";
-  const ga=(p.tG||p.tA)?`<div class="jga">${p.tG?`<span class="ga-g">⚽${p.tG}</span>`:""}${p.tA?`<span class="ga-a">👟${p.tA}</span>`:""}</div>`:"";
   const boost=p.tmp?`<span class="rg-boost ${p.tmp>0?"up":"dn"}">${p.tmp>0?"+":""}${p.tmp}</span>`:"";
-  return `<div class="jersey tier-${t}" title="${p.name} · ex ${p.clubShort||p.club}">
+  return `<div class="jersey tier-${t}">
     <div class="kit ${t}">${kitSVG(kitOf(),p.rating)}${p.capt?'<span class="armband">C</span>':""}<span class="kit-pos">${s.pos}</span>${mr}${boost}</div>
     <div class="jname">${surname(p.name)}</div>
     <div class="jbar"><i class="pot" style="width:${pot}%"></i><i class="cur" style="width:${cur}%"></i></div>
-    <div class="jpot">POT ${p.potential}</div>${ga}</div>`;
+    <div class="jpot">POT ${p.potential}</div></div>`;
 }
 function pitchHTML(){
   return `<div class="pitch"><div class="pitch-lines"><span class="cc"></span><span class="hl"></span><span class="box t"></span><span class="box b"></span></div>
@@ -507,16 +526,26 @@ function mountHub(){
 }
 function refreshHub(){if(R.phase==="hub")mountHub();}
 function flashSlot(i){const n=q(`.slot[data-rslot="${i}"] .kit`);if(n)n.classList.add("boostflash");}
-function markSwap(i){qa(".slot.swap-from").forEach(n=>n.classList.remove("swap-from"));if(i!=null){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("swap-from");}}
+function markSwap(i){
+  qa(".slot.swap-from").forEach(n=>n.classList.remove("swap-from"));
+  qa(".slot.swap-ok").forEach(n=>n.classList.remove("swap-ok"));
+  if(i==null)return;
+  const sel=q(`.slot[data-rslot="${i}"]`); if(sel)sel.classList.add("swap-from");
+  const a=xi()[i].p; if(!a)return;
+  const can=(p,pos)=>(ACC[pos]||[]).some(c=>p.pos.includes(c));
+  xi().forEach((s,j)=>{ if(j===i)return;
+    if(can(a,s.pos)&&(!s.p||can(s.p,xi()[i].pos))){const m=q(`.slot[data-rslot="${j}"]`);if(m)m.classList.add("swap-ok");} // valid swap target → glows
+  });
+}
 function repaintSlot(i){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.innerHTML=jerseyHTML(xi()[i],i);}
 function onSlot(i){
   if(R.phase!=="hub")return;
-  if(R.rp)return; // choosing a transfer/reward card — ignore XI swaps
   const s=xi()[i];
-  if(R.boostTarget!=null){ // applying a targeted item/reward
+  if(R.boostTarget!=null){ // applying a targeted item/reward — TAKES PRIORITY (never gets stuck behind a pending transfer/signing)
     if(!s.p)return;
-    applyTarget(R.boostTarget,s.p); R.boostTarget=null; refreshHub(); flashSlot(i); return;
+    applyTarget(R.boostTarget,s.p); R.boostTarget=null; R.swapFrom=null; refreshHub(); flashSlot(i); return;
   }
+  if(R.rp)return; // choosing a transfer/reward card — ignore XI swaps
   // SWAP — done surgically (highlight / repaint only the affected jerseys + ratings), never a full hub re-render (that "reload" flash)
   if(R.swapFrom==null){ if(s.p){R.swapFrom=i; markSwap(i);} return; }     // pick the first player
   if(R.swapFrom===i){ R.swapFrom=null; markSwap(null); return; }          // tap him again → deselect
@@ -1086,7 +1115,7 @@ function act(r,v,btn){
 }
 /* signing placement intercepts slot clicks */
 const _onSlot=onSlot;
-onSlot=function(i){ if(R&&R.signing){trySign(i);return;} _onSlot(i); };
+onSlot=function(i){ if(R&&R.boostTarget!=null){_onSlot(i);return;} if(R&&R.signing){trySign(i);return;} _onSlot(i); };
 
 /* TEMP debug hook — REMOVE before shipping */
 window.__RG={

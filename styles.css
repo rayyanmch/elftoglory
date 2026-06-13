@@ -149,8 +149,18 @@ b{font-weight:700}
 @keyframes pulseG{0%,100%{box-shadow:0 0 0 2px var(--gold),0 0 12px rgba(255,206,77,.4)}50%{box-shadow:0 0 0 2px var(--gold),0 0 22px rgba(255,206,77,.8)}}
 .slot.targetable .kit{outline:2px solid var(--accent);outline-offset:3px;border-radius:50%;animation:pulseA 1s infinite}
 .slot.swap-from .kit{outline:2px solid var(--gold);outline-offset:3px;border-radius:50%}
-.slot.swap-ok .kit,.slot.swap-ok .jersey.empty{outline:2px dashed var(--accent);outline-offset:3px;animation:pulseA 1.1s infinite}
+.slot.swap-ok .kit{outline:2px dashed var(--accent);outline-offset:3px;border-radius:50%;animation:pulseA 1.1s infinite}
+.slot.swap-ok .jersey.empty{outline:2px dashed var(--accent);outline-offset:2px;animation:pulseA 1.1s infinite}
 @keyframes pulseA{0%,100%{outline-color:rgba(23,214,110,.55)}50%{outline-color:rgba(23,214,110,1)}}
+
+/* hover stat tooltip (own XI) */
+.ptip{position:fixed;z-index:9999;pointer-events:none;background:linear-gradient(180deg,#141c29,#0e1420);border:1px solid var(--line2);border-radius:11px;padding:.5rem .6rem;box-shadow:0 10px 30px rgba(0,0,0,.55);font-size:.72rem;max-width:210px;animation:tipIn .12s ease-out}
+@keyframes tipIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ptip-nm{font-weight:800;font-size:.82rem;color:var(--txt);line-height:1.15}
+.ptip-sub{color:var(--gold);font-size:.66rem;font-weight:700;margin:.05rem 0 .4rem}
+.ptip-grid{display:grid;grid-template-columns:1fr 1fr;gap:.18rem .7rem;color:var(--muted)}
+.ptip-grid span{white-space:nowrap}
+.ptip-grid b{color:var(--txt);font-weight:800}
 
 /* coach badge */
 .coach-slot{position:absolute;left:8px;bottom:8px;z-index:3}
