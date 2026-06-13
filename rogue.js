@@ -544,6 +544,14 @@ function paintTargets(on){qa(".slot.targetable").forEach(n=>n.classList.remove("
 function repaintLeft(){const n=q(".play-grid .left");if(n)n.innerHTML=heartsHTML()+boostPromptHTML()+passivesHTML()+historyHTML();}
 function repaintRight(){const n=q(".play-grid .right");if(n)n.innerHTML=rightHTML();}
 function repaintRatings(){const rt=q(".ratings");if(rt)rt.outerHTML=ratingsHTML();}
+function refreshPanels(){ // surgical in-hub refresh of the dynamic panels (transfer/reward cards, item locker, slot highlights) WITHOUT rebuilding the pitch SVGs → no "reload" flash. Falls back to a full mount if the hub isn't on screen yet.
+  if(R.phase!=="hub"||!q(".pitch")){mountHub();return;}
+  repaintRight(); repaintLeft();
+  qa(".slot.candidate,.slot.targetable").forEach(n=>n.classList.remove("candidate","targetable"));
+  if(R.signing)R.signing.fits.forEach(i=>{const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("candidate");});
+  else if(R.boostTarget!=null)xi().forEach((s,i)=>{if(s.p){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("targetable");}});
+  maybeInvite();
+}
 function onSlot(i){
   if(R.phase!=="hub")return;
   const s=xi()[i];
@@ -736,16 +744,16 @@ function pPerMin(){
   const _ld=L.gf-L.ga; if(_ld>=3)lamY*=0.6; else if(_ld<=-3)lamO*=0.6;
   return {lamY,lamO};
 }
-// Win/Draw/Loss odds — Monte-Carlo over the SAME per-minute model (phil/focus/passives + late-AI + damper), simulated from the current minute & score to full time. At kick-off it's a pre-match line; in play it's a live win probability.
+// Pre-match odds — Monte-Carlo over the per-minute model with NEUTRAL coaching (balanced philosophy AND balanced focus) from 0:0 to full time. A FIXED squad-vs-squad line: it does NOT react to the coach's in-match Philosophy/Focus choices, and never drifts with the live score (by design — the user wants a stable pre-match number).
 function wdlOdds(){
   if(!L)return null;
-  const e=myEff(),ph=PHIL[L.phil];
+  const savedFoc=L.foc; L.foc="bal"; const e=myEff(); L.foc=savedFoc;   // strip the Focus coaching bonus from the line
   const sp=R.passives.setp?1.06:1, ir=R.passives.iron?0.94:1, gk=R.passives.gkaura?0.92:1;
-  const bY=clamp(1.6+(e.atk-L.oDef)*0.16,0.15,5.5)/90*ph.own*sp;
-  const bO=clamp(1.6+(L.oAtk-e.def)*0.16,0.12,5.0)/90*ph.opp*ir*gk;
-  const start=Math.max(1,L.min),N=1400; let w=0,d=0;
-  for(let k=0;k<N;k++){ let gf=L.gf,go=L.ga;
-    for(let m=start;m<=90;m++){ let lamY=bY,lamO=bO;
+  const bY=clamp(1.6+(e.atk-L.oDef)*0.16,0.15,5.5)/90*sp;               // balanced philosophy (own/opp ×1) → no philosophy influence
+  const bO=clamp(1.6+(L.oAtk-e.def)*0.16,0.12,5.0)/90*ir*gk;
+  const N=1400; let w=0,d=0;
+  for(let k=0;k<N;k++){ let gf=0,go=0;                                  // always from 0:0 → a pre-match line, never the live score
+    for(let m=1;m<=90;m++){ let lamY=bY,lamO=bO;
       if(m>=70&&go<gf){lamO*=1.25;lamY*=0.9;} if(m>=80&&go>gf){lamO*=0.7;lamY*=0.85;}
       const ld=gf-go; if(ld>=3)lamY*=0.6; else if(ld<=-3)lamO*=0.6;
       if(Math.random()<lamY)gf++; if(Math.random()<lamO)go++; }
@@ -753,11 +761,10 @@ function wdlOdds(){
   return {w:w/N,d:d/N,l:(N-w-d)/N};
 }
 function renderWDL(){
-  const box=q("[data-wdl]"); if(!box||!L||L.done)return;
+  const box=q("[data-wdl]"); if(!box||!L)return;
   const o=wdlOdds(); if(!o)return;
   const pc=x=>Math.round(x*100);
-  const live=L.min>0&&L.min<90;
-  box.innerHTML=`<div class="wdl-lab">${live?"Win chance":"Pre-match odds"}</div>
+  box.innerHTML=`<div class="wdl-lab">Pre-match odds</div>
     <div class="wdl-bar"><span class="wdl-w" style="width:${(o.w*100).toFixed(1)}%"></span><span class="wdl-d" style="width:${(o.d*100).toFixed(1)}%"></span><span class="wdl-l" style="width:${(o.l*100).toFixed(1)}%"></span></div>
     <div class="wdl-legend"><span class="wl-w">● Win ${pc(o.w)}%</span><span class="wl-d">● Draw ${pc(o.d)}%</span><span class="wl-l">● Loss ${pc(o.l)}%</span></div>`;
 }
@@ -790,10 +797,9 @@ function goal(side){
 function tick(){
   L.min++;
   const ck=q("[data-clock]");if(ck)ck.textContent=L.min;
-  const {lamY,lamO}=pPerMin(); const _g0=L.gf+L.ga;
+  const {lamY,lamO}=pPerMin();
   if(Math.random()<lamY)goal("you");
   if(Math.random()<lamO)goal("opp");
-  if(L.gf+L.ga!==_g0||L.min%10===0)renderWDL(); // refresh odds on every goal + every 10' for the time-drift
   if(Math.random()<0.017){const side=Math.random()<0.5?"you":"opp";const arr=side==="you"?L.mine:L.ox;feed(L.min,"🟨",`Yellow — ${pick(arr).name}.`);}
   if(Math.random()<0.0011){const side=Math.random()<0.5?"you":"opp";const arr=side==="you"?L.mine:L.ox,off=side==="you"?L.offMine:L.offOpp;
     const c=arr.map((_,i)=>i).filter(i=>arr[i].pos!=="GK"&&!off.has(i));
@@ -893,7 +899,7 @@ function finishMatch(){
         R.cup.faced=(R.cup.faced||[]).concat(beaten.name);
         R.cup.stage++;
         R.cup.opp=R.cup.def.id==="final"?finalOpp(R.cup.stage):cupOpp(R.cup.def,R.cup.stage);
-        growthPopup(changes,()=>transferWindow(beaten,{count:R.passives.scout?6:5,margin:L.gf-L.ga},()=>{R.offers=null;mountHub();}));
+        growthPopup(changes,()=>transferWindow(beaten,{count:R.passives.scout?6:5,margin:L.gf-L.ga},()=>{R.offers=null;refreshPanels();}));
       } else { // CUP WON
         const def=R.cup.def, beaten=L.opp;
         if(def.id==="ucl"){R.uclFinalOpp=ALL.clubs.find(c=>c.name===beaten.name)||null;}
@@ -910,7 +916,7 @@ function finishMatch(){
             :ew?{eliteMin:clamp(myOVR(),ew.min,ew.cap),eliteCap:ew.cap,lucky:ew.lucky,luckyProb:0.05,count:R.passives.scout?6:5}
             :{count:R.passives.scout?6:5};
           transferWindow(beaten,opts,()=>{
-            const finish=()=>{R.offers=null;if(def.id==="ucl")showFinalInvite();else mountHub();};
+            const finish=()=>{R.offers=null;if(def.id==="ucl")showFinalInvite();else refreshPanels();};
             if(R.pendingUnlock){R.pendingUnlock=false;R.items.push("unlock");toast("💎 Potential Unlock added to your Items");}
             finish();
           });
@@ -1020,8 +1026,8 @@ function placeSigning(p,cb){
   R.phase="hub";R.offers=null;
   const fits=xi().map((s,i)=>((ACC[s.pos]||[]).some(c=>p.pos.includes(c))?i:-1)).filter(i=>i>=0);
   if(!fits.length){R.signing=null;mountHub();toast("No position fits — signing cancelled");return cb&&cb();}
-  R.signing={p,fits,cb};   // set BEFORE mountHub so the right panel shows the new player
-  mountHub();              // mountHub highlights R.signing.fits as .candidate
+  R.signing={p,fits,cb};   // set BEFORE the refresh so the right panel shows the new player
+  refreshPanels();         // surgical: shows the signing panel + highlights fits as .candidate (no pitch rebuild → no flash)
   toast(`✍️ ${surname(p.name)} signed — tap a highlighted spot`);
 }
 function trySign(i){
@@ -1029,7 +1035,9 @@ function trySign(i){
   if(!R.signing.fits.includes(i))return true; // swallow click while signing
   const old=xi()[i].p; xi()[i].p=R.signing.p;
   toast(old?`${surname(R.signing.p.name)} replaces ${surname(old.name)}`:`${surname(R.signing.p.name)} slots in`);
-  const cb=R.signing.cb; R.signing=null; if(cb)cb(); else refreshHub();
+  const cb=R.signing.cb; R.signing=null;
+  repaintSlot(i); repaintRatings(); qa(".slot.candidate").forEach(n=>n.classList.remove("candidate")); // surgical: the new jersey + ratings, drop the highlights (no full re-render)
+  if(cb)cb(); else refreshPanels();
   return true;
 }
 
@@ -1047,7 +1055,7 @@ function rollRewards(margin){
 }
 function rewardOverlay(cb,margin){
   R.rp={kind:"reward",opts:rollRewards(margin),cb};
-  R.phase="hub"; mountHub();
+  R.phase="hub"; refreshPanels();   // show the reward cards in the right panel without rebuilding the pitch (no flash after placing a signing)
 }
 function applyReward(r){
   switch(r.id){
@@ -1143,14 +1151,14 @@ function act(r,v,btn){
     case "endless":R.cupIdx=CUPS.length-1;R.cupCounter=CUPS[CUPS.length-1].after;R.cup=null;R.offers=null;mountHub();break;
     case "play":{const opp=R.offers[+v];startMatch({name:opp.name,kit:opp.kit,ovr:opp.ovr,tier:opp.tier,league:opp.league,xi:opp.xi},{label:"League match",ko:false,cup:null});break;}
     case "cup-play":{const c=R.cup;startMatch(c.opp,{label:`${c.def.nm} · ${["Quarter-final","Semi-final","FINAL"][c.stage]}`,ko:true,cup:c});break;}
-    case "phil":if(L&&!L.done){L.phil=v;R.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);renderWDL();}break;
-    case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);renderWDL();}break;
+    case "phil":if(L&&!L.done){L.phil=v;R.phil=v;qa('[data-r="phil"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,PHIL[v].ico,`Coach call: <b>${PHIL[v].lab}</b>.`);}break;
+    case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);}break;
     case "skip":skip();break;
     case "cont":finishMatch();break;
     case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player for +5 rating (up to potential)"};toast(m[id]);repaintRight();repaintLeft();paintTargets(true);}break;}
     case "tpick":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;if(btn&&btn.disabled)break;const p=rp.cands[+v];const cb=rp.cb;R.rp=null;placeSigning(clone(p),cb);break;}
-    case "tskip":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;const cb=rp.cb;R.rp=null;if(cb)cb();else refreshHub();break;}
-    case "rpick":{const rp=R.rp;if(!rp||rp.kind!=="reward")break;const r=rp.opts[+v];const cb=rp.cb;R.rp=null;applyReward(r);if(cb)cb();else refreshHub();break;}
+    case "tskip":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;const cb=rp.cb;R.rp=null;if(cb)cb();else refreshPanels();break;}
+    case "rpick":{const rp=R.rp;if(!rp||rp.kind!=="reward")break;const r=rp.opts[+v];const cb=rp.cb;R.rp=null;applyReward(r);if(cb)cb();else refreshPanels();break;}
   }
 }
 /* signing placement intercepts slot clicks */
