@@ -539,12 +539,20 @@ function markSwap(i){
   });
 }
 function repaintSlot(i){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.innerHTML=jerseyHTML(xi()[i],i);}
+// surgical hub patches — avoid a full mountHub re-render (the "reload" flash): only the side columns / ratings / target glow change, the pitch SVGs are never rebuilt
+function paintTargets(on){qa(".slot.targetable").forEach(n=>n.classList.remove("targetable"));if(on)xi().forEach((s,i)=>{if(s.p){const n=q(`.slot[data-rslot="${i}"]`);if(n)n.classList.add("targetable");}});}
+function repaintLeft(){const n=q(".play-grid .left");if(n)n.innerHTML=heartsHTML()+boostPromptHTML()+passivesHTML()+historyHTML();}
+function repaintRight(){const n=q(".play-grid .right");if(n)n.innerHTML=rightHTML();}
+function repaintRatings(){const rt=q(".ratings");if(rt)rt.outerHTML=ratingsHTML();}
 function onSlot(i){
   if(R.phase!=="hub")return;
   const s=xi()[i];
   if(R.boostTarget!=null){ // applying a targeted item/reward — TAKES PRIORITY (never gets stuck behind a pending transfer/signing)
     if(!s.p)return;
-    applyTarget(R.boostTarget,s.p); R.boostTarget=null; R.swapFrom=null; refreshHub(); flashSlot(i); return;
+    const kind=R.boostTarget; applyTarget(kind,s.p); R.boostTarget=null; R.swapFrom=null;
+    paintTargets(false); repaintLeft();                          // drop the target glow + the boost-prompt (no full re-render → no flash)
+    if(kind==="extend")xi().forEach((_,j)=>repaintSlot(j)); else repaintSlot(i); // captain moved → repaint all jerseys; else just the boosted one
+    repaintRatings(); flashSlot(i); return;
   }
   if(R.rp)return; // choosing a transfer/reward card — ignore XI swaps
   // SWAP — done surgically (highlight / repaint only the affected jerseys + ratings), never a full hub re-render (that "reload" flash)
@@ -1139,7 +1147,7 @@ function act(r,v,btn){
     case "foc":if(L&&!L.done){L.foc=v;R.foc=v;qa('[data-r="foc"]').forEach(b=>b.classList.toggle("on",b.dataset.v===v));feed(L.min||1,FOCUS[v].ico,`Focus: <b>${FOCUS[v].lab}</b>.`);renderWDL();}break;
     case "skip":skip();break;
     case "cont":finishMatch();break;
-    case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player for +5 rating (up to potential)"};toast(m[id]);refreshHub();}break;}
+    case "use-item":{const ix=+v,id=R.items[ix];if(id==="drink"||id==="extend"||id==="unlock"){R.items.splice(ix,1);R.boostTarget=id;const m={drink:"⚡ Tap a player to boost +4 next match",extend:"🖋️ Tap a player to make him captain",unlock:"💎 Tap a player for +5 rating (up to potential)"};toast(m[id]);repaintRight();repaintLeft();paintTargets(true);}break;}
     case "tpick":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;if(btn&&btn.disabled)break;const p=rp.cands[+v];const cb=rp.cb;R.rp=null;placeSigning(clone(p),cb);break;}
     case "tskip":{const rp=R.rp;if(!rp||rp.kind!=="transfer")break;const cb=rp.cb;R.rp=null;if(cb)cb();else refreshHub();break;}
     case "rpick":{const rp=R.rp;if(!rp||rp.kind!=="reward")break;const r=rp.opts[+v];const cb=rp.cb;R.rp=null;applyReward(r);if(cb)cb();else refreshHub();break;}
